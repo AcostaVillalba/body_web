@@ -1,144 +1,324 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BODY BY J.A. - Elite Coach Panel</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700;900&display=swap" rel="stylesheet">
     <style>
-        :root { --gold: #c5a021; --black: #111; --bg: #f0f2f5; }
-        body { font-family: 'Montserrat', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
-        
-        .admin-container { max-width: 1200px; margin: 0 auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 15px 50px rgba(0,0,0,0.1); }
-        
-        .header { text-align: center; border-bottom: 6px solid var(--gold); padding-bottom: 20px; margin-bottom: 40px; }
-        .header h1 { font-weight: 900; font-size: 3.5rem; margin: 0; letter-spacing: -2px; }
-        .header span { color: var(--gold); }
+        :root {
+            --gold: #c5a021;
+            --black: #111;
+            --bg: #f0f2f5;
+        }
 
-        .section-title { background: var(--black); color: white; padding: 12px 25px; font-weight: bold; margin: 30px 0 15px 0; text-transform: uppercase; border-radius: 4px; }
-        
-        .grid-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 30px; }
-        .field { display: flex; flex-direction: column; }
-        .field label { font-size: 10px; font-weight: 800; margin-bottom: 5px; color: #666; text-transform: uppercase; }
-        input, select, textarea { padding: 12px; border: 2px solid #eee; border-radius: 8px; font-family: inherit; transition: 0.3s; }
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 6px solid var(--gold);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-weight: 900;
+            font-size: 3.5rem;
+            margin: 0;
+            letter-spacing: -2px;
+        }
+
+        .header span {
+            color: var(--gold);
+        }
+
+        .section-title {
+            background: var(--black);
+            color: white;
+            padding: 12px 25px;
+            font-weight: bold;
+            margin: 30px 0 15px 0;
+            text-transform: uppercase;
+            border-radius: 4px;
+        }
+
+        .grid-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .field label {
+            font-size: 10px;
+            font-weight: 800;
+            margin-bottom: 5px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        input,
+        select,
+        textarea {
+            padding: 12px;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            font-family: inherit;
+            transition: 0.3s;
+        }
 
         /* Bloques de Rutina */
-        .day-container { border: 2px solid #f0f0f0; margin-bottom: 40px; border-radius: 12px; overflow: hidden; background: #fafafa; }
-        .day-header { background: var(--black); color: white; padding: 15px 25px; font-size: 1.5rem; font-weight: 900; display: flex; justify-content: space-between; align-items: center; }
-        
-        .exercise-group { background: white; margin: 15px; padding: 20px; border-radius: 10px; border: 1px solid #ddd; position: relative; }
-        
-        .exercise-sub-row { display: grid; grid-template-columns: 1.5fr 1fr 1.5fr 250px; gap: 15px; padding: 15px 0; align-items: start; }
-        
-        .metric-split { display: flex; gap: 10px; align-items: center; }
-        .metric-field { display: flex; flex-direction: column; flex: 1; }
-        .metric-field label { font-size: 9px; color: var(--gold); margin-bottom: 3px; }
-        .metric-field input { padding: 10px; text-align: center; font-weight: bold; border-color: #e0e0e0; }
+        .day-container {
+            border: 2px solid #f0f0f0;
+            margin-bottom: 40px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #fafafa;
+        }
 
-        .img-upload-big { width: 250px; height: 180px; border: 3px dashed #ccc; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; position: relative; background: #fff; }
-        .img-upload-big img { width: 100%; height: 100%; object-fit: cover; }
-        .img-upload-big input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .day-header {
+            background: var(--black);
+            color: white;
+            padding: 15px 25px;
+            font-size: 1.5rem;
+            font-weight: 900;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-        .btn { padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
-        .btn-add-day { background: var(--gold); color: white; }
-        .btn-biserie { background: #eee; color: #333; font-size: 11px; margin-top: 10px; }
-        .btn-generate { background: var(--black); color: white; width: 100%; font-size: 1.4rem; padding: 30px; margin-top: 50px; border-radius: 15px; }
-        .btn-del { background: #ff4d4d; color: white; font-size: 10px; padding: 5px 10px; position: absolute; top: 10px; right: 10px; }
+        .exercise-group {
+            background: white;
+            margin: 15px;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            position: relative;
+        }
+
+        .exercise-sub-row {
+            display: grid;
+            grid-template-columns: 1.5fr 120px 2fr 250px;
+            gap: 15px;
+            padding: 15px 0;
+            align-items: start;
+        }
+
+        .metric-split {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .metric-field {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .metric-field label {
+            font-size: 9px;
+            color: var(--gold);
+            margin-bottom: 3px;
+        }
+
+        .metric-field input {
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            border-color: #e0e0e0;
+            width: 50px;
+            height: 35px;
+            box-sizing: border-box;
+        }
+
+        .img-upload-big {
+            width: 250px;
+            height: 180px;
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            cursor: pointer;
+            position: relative;
+            background: #fff;
+        }
+
+        .img-upload-big img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .img-upload-big input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .btn-add-day {
+            background: var(--gold);
+            color: white;
+        }
+
+        .btn-biserie {
+            background: #eee;
+            color: #333;
+            font-size: 11px;
+            margin-top: 10px;
+        }
+
+        .btn-generate {
+            background: var(--black);
+            color: white;
+            width: 100%;
+            font-size: 1.4rem;
+            padding: 30px;
+            margin-top: 50px;
+            border-radius: 15px;
+        }
+
+        .btn-del {
+            background: #ff4d4d;
+            color: white;
+            font-size: 10px;
+            padding: 5px 10px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
     </style>
 </head>
+
 <body>
 
-<div class="admin-container">
-    <div class="header">
-        <h1>BODY BY <span>J.A.</span></h1>
-        <p>CONTROL PANEL | JUAN CARLOS GONZÁLEZ</p>
-    </div>
-
-    <!-- DATOS ATLETA -->
-    <div class="section-title">Datos del Atleta</div>
-    <div class="grid-inputs">
-        <div class="field"><label>Nombre del Cliente</label><input type="text" id="p_name"></div>
-        <div class="field"><label>ID</label><input type="number" id="p_id"></div>
-        <div class="field"><label>Edad</label><input type="number" id="p_age"></div>
-        <div class="field"><label>Peso (kg)</label><input type="number" id="p_weight"></div>
-        <div class="field"><label>Objetivo</label>
-            <select id="p_goal">
-                <option>Definición Muscular</option>
-                <option>Volumen Muscular</option>
-                <option>Mantenimiento Físico</option>
-                <option>Recomposicion Corporal</option>
-            </select>
+    <div class="admin-container">
+        <div class="header">
+            <h1>BODY BY <span>J.A.</span></h1>
+            <p>CONTROL PANEL | JUAN CARLOS GONZÁLEZ</p>
         </div>
+
+        <!-- DATOS ATLETA -->
+        <div class="section-title">Datos del Atleta</div>
+        <div class="grid-inputs">
+            <div class="field"><label>Nombre del Cliente</label><input type="text" id="p_name"></div>
+            <div class="field"><label>ID</label><input type="number" id="p_id"></div>
+            <div class="field"><label>Edad</label><input type="number" id="p_age"></div>
+            <div class="field"><label>Peso (kg)</label><input type="number" id="p_weight"></div>
+            <div class="field"><label>Objetivo</label>
+                <select id="p_goal">
+                    <option>Definición Muscular</option>
+                    <option>Volumen Muscular</option>
+                    <option>Mantenimiento Físico</option>
+                    <option>Recomposicion Corporal</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-title">Configurar Rutina</div>
+        <div style="text-align:center; padding: 20px; background: #f9f9f9; border-radius: 10px;">
+            <label><input type="checkbox" value="Lunes"> Lunes</label>
+            <label><input type="checkbox" value="Martes"> Martes</label>
+            <label><input type="checkbox" value="Miércoles"> Miércoles</label>
+            <label><input type="checkbox" value="Jueves"> Jueves</label>
+            <label><input type="checkbox" value="Viernes"> Viernes</label>
+            <label><input type="checkbox" value="Sábado"> Sábado</label>
+            <button class="btn btn-add-day" onclick="renderDays()" style="margin-left:20px">Crear Días</button>
+        </div>
+
+        <div id="routine-builder"></div>
+
+        <button class="btn btn-generate" onclick="generateClientPortal()">GENERAR PLAN PARA EL CLIENTE</button>
     </div>
 
-    <div class="section-title">Configurar Rutina</div>
-    <div style="text-align:center; padding: 20px; background: #f9f9f9; border-radius: 10px;">
-        <label><input type="checkbox" value="Lunes"> Lunes</label>
-        <label><input type="checkbox" value="Martes"> Martes</label>
-        <label><input type="checkbox" value="Miércoles"> Miércoles</label>
-        <label><input type="checkbox" value="Jueves"> Jueves</label>
-        <label><input type="checkbox" value="Viernes"> Viernes</label>
-        <label><input type="checkbox" value="Sábado"> Sábado</label>
-        <button class="btn btn-add-day" onclick="renderDays()" style="margin-left:20px">Crear Días</button>
-    </div>
+    <script>
+        const EXERCISES_DB = {
+            "PECHO": ["Press de banca con barra", "Press banca inclinado con mancuernas", "Aperturas en máquina Peck Deck o Contractora", "Cruce de poleas", "Press de banca inclinado con barra", "Press de banca con mancuernas", "Aperturas con mancuernas", "Aperturas Inclinadas con mancuernas", "Press de banca en máquina sentado", "Press de banca declinado con barra", "Press de banca declinado con mancuernas", "Flexiones", "Pull over con mancuerna"],
+            "ESPALDA": ["Remo con mancuerna a una mano", "Remo con barra", "Remo en barra T", "Remo en máquina", "Remo inclinado con barra con agarre supinado", "Remo inclinado con mancuernas", "Jalón al pecho con agarre cerrado", "Jalón al pecho con agarre invertido", "Pull over con cuerda", "Pull over en polea con barra", "Jalón con agarre ancho", "Elevaciones en barra fija", "Elevaciones en barra fija con agarre supinado", "Pull over con mancuerna", "Pull over con barra", "Encogimiento de hombros con barra", "Encogimiento de hombros con mancuernas"],
+            "HOMBROS": [],
+            "BICEPS": ["Curl con barra", "Curl alterno con mancuerna", "Curl con cuerda en polea", "Curl con barra EZ", "Curl de predicador con barra EZ", "Curl alterno de martillo con mancuernas", "Curl inclinado con mancuernas", "Curl concentrado con mancuerna", "Curl de cable con barra recta en polea baja", "Curl de cable en polea alta de pie", "Curl de muñeca con barra sentado", "Extensión de muñeca con barra sentado"],
+            "TRICEPS": [],
+            "CORE/ABS": ["Rueda", "Plancha", "Plancha lateral", "Crunch", "Crunch oblicuo", "Crunch bicicleta", "Elevaciones de piernas colgado", "Abdominales en máquina", "Abdominales con cuerda en polea alta", "Plancha con flexión", "Abdominales con brazos estirados"],
+            "CUADRICEPS": ["Hack", "Extensión de pierna", "Extensión de pierna unipodal", "Zancadas", "Prensa de pierna", "Prensa frontal", "Tijera estática", "Step up", "Sentadilla goblet", "Sentadilla Smith", "Sentadilla con peso corporal", "Sentadillas con saltos pliometricos", "Sentadillas isometrica apoyo en pared", "Sentadilla búlgara con peso corporal", "Sentadilla búlgara con mancuernas", "Sentadilla búlgara con barra", "Sentadilla con saco", "Sentadilla en polea baja", "Sentadilla talones elevados", "Sentadilla en banco"],
+            "ADUCTOR": ["Sentadilla sumó con mancuerna", "Prensa en eversión", "Hack en eversión", "Máquina aductor", "Sentadilla sumo con peso corporal", "Aductor con balón"],
+            "FEMORAL": ["Peso muerto con barra", "Peso muerto unipodal", "Curl acostado", "Curl acostado unipodal", "Curl sentado", "Curl sentado unipodal", "Prensa alta"],
+            "GLUTEO": ["Sentadilla libre", "Reverso", "Sentadilla búlgara con inclinación", "Step up con mancuerna", "Patada en polea", "Tijera estatica en Smith", "Sentadilla sumo con barra", "Hip thrusts", "Hip thrusts unipodal", "Puente con banda", "Puente con propio peso", "Puente con balón Fit ball", "Extensión de cadera con mancuerna", "Abducción en máquina", "Abducción unipodal en polea"],
+            "PANTORRILLA": ["Pantorrilla en prensa", "Pantorrilla en hack", "Planti flexión dorsi flexión en máquina ", "Elevación de talones de pie sin peso", "Elevación de talones en máquina Smit", "Elevación de talones en máquina sentado", "Elevación de talones unipodal con peso", "Elevación de talones unipodal sin peso"],
+            "SALTOS": ["Saltar cuerda", "Burpees", "Jumping jacks", "Sprints", "Columpios"],
+            "CARDIO": ["Caminadora", "Bicicleta estática", "Elíptica", "Escaladora"]
+        };
 
-    <div id="routine-builder"></div>
-
-    <button class="btn btn-generate" onclick="generateClientPortal()">GENERAR PLAN PARA EL CLIENTE</button>
-</div>
-
-<script>
-    const EXERCISES_DB = {
-        "PECHO": ["Press de banca con barra", "Press banca inclinado con mancuernas", "Aperturas en máquina Peck Deck o Contractora", "Cruce de poleas", "Press de banca inclinado con barra", "Press de banca con mancuernas", "Aperturas con mancuernas", "Aperturas Inclinadas con mancuernas", "Press de banca en máquina sentado", "Press de banca declinado con barra", "Press de banca declinado con mancuernas", "Flexiones", "Pull over con mancuerna"],
-        "ESPALDA": ["Remo con mancuerna a una mano", "Remo con barra", "Remo en barra T", "Remo en máquina", "Remo inclinado con barra con agarre supinado", "Remo inclinado con mancuernas", "Jalón al pecho con agarre cerrado", "Jalón al pecho con agarre invertido", "Pull over con cuerda", "Pull over en polea con barra", "Jalón con agarre ancho", "Elevaciones en barra fija", "Elevaciones en barra fija con agarre supinado", "Pull over con mancuerna", "Pull over con barra", "Encogimiento de hombros con barra", "Encogimiento de hombros con mancuernas"],
-        "HOMBROS": [],
-        "BICEPS": ["Curl con barra", "Curl alterno con mancuerna", "Curl con cuerda en polea", "Curl con barra EZ", "Curl de predicador con barra EZ", "Curl alterno de martillo con mancuernas", "Curl inclinado con mancuernas", "Curl concentrado con mancuerna", "Curl de cable con barra recta en polea baja", "Curl de cable en polea alta de pie", "Curl de muñeca con barra sentado", "Extensión de muñeca con barra sentado"],
-        "TRICEPS":[],
-        "CORE/ABS": ["Rueda", "Plancha", "Plancha lateral", "Crunch", "Crunch oblicuo", "Crunch bicicleta", "Elevaciones de piernas colgado", "Abdominales en máquina", "Abdominales con cuerda en polea alta", "Plancha con flexión", "Abdominales con brazos estirados"],
-        "CUADRICEPS":["Hack", "Extensión de pierna", "Extensión de pierna unipodal", "Zancadas", "Prensa de pierna", "Prensa frontal", "Tijera estática", "Step up", "Sentadilla goblet", "Sentadilla Smith", "Sentadilla con peso corporal", "Sentadillas con saltos pliometricos", "Sentadillas isometrica apoyo en pared", "Sentadilla búlgara con peso corporal", "Sentadilla búlgara con mancuernas", "Sentadilla búlgara con barra", "Sentadilla con saco", "Sentadilla en polea baja", "Sentadilla talones elevados", "Sentadilla en banco"],
-        "ADUCTOR":["Sentadilla sumó con mancuerna", "Prensa en eversión", "Hack en eversión", "Máquina aductor", "Sentadilla sumo con peso corporal", "Aductor con balón"],
-        "FEMORAL":["Peso muerto con barra", "Peso muerto unipodal", "Curl acostado", "Curl acostado unipodal", "Curl sentado", "Curl sentado unipodal", "Prensa alta"],
-        "GLUTEO":["Sentadilla libre", "Reverso", "Sentadilla búlgara con inclinación", "Step up con mancuerna", "Patada en polea", "Tijera estatica en Smith", "Sentadilla sumo con barra", "Hip thrusts", "Hip thrusts unipodal", "Puente con banda", "Puente con propio peso", "Puente con balón Fit ball", "Extensión de cadera con mancuerna", "Abducción en máquina", "Abducción unipodal en polea"],
-        "PANTORRILLA":["Pantorrilla en prensa", "Pantorrilla en hack", "Planti flexión dorsi flexión en máquina ", "Elevación de talones de pie sin peso", "Elevación de talones en máquina Smit", "Elevación de talones en máquina sentado", "Elevación de talones unipodal con peso", "Elevación de talones unipodal sin peso"],
-        "SALTOS": ["Saltar cuerda", "Burpees", "Jumping jacks", "Sprints", "Columpios"],
-        "CARDIO": ["Caminadora", "Bicicleta estática", "Elíptica", "Escaladora"]
-    };
-
-    function renderDays() {
-        const container = document.getElementById('routine-builder');
-        container.innerHTML = '';
-        document.querySelectorAll('input[type="checkbox"]:checked').forEach(day => {
-            const div = document.createElement('div');
-            div.className = 'day-container';
-            div.innerHTML = `
+        function renderDays() {
+            const container = document.getElementById('routine-builder');
+            container.innerHTML = '';
+            document.querySelectorAll('input[type="checkbox"]:checked').forEach(day => {
+                const div = document.createElement('div');
+                div.className = 'day-container';
+                div.innerHTML = `
                 <div class="day-header">${day.value} <button class="btn btn-add-day" onclick="addExGroup('${day.value}')">+ Bloque</button></div>
                 <div id="list-${day.value}"></div>
             `;
-            container.appendChild(div);
-        });
-    }
+                container.appendChild(div);
+            });
+        }
 
-    function addExGroup(day) {
-        const list = document.getElementById(`list-${day}`);
-        const group = document.createElement('div');
-        group.className = 'exercise-group';
-        group.innerHTML = `
+        function addExGroup(day) {
+            const list = document.getElementById(`list-${day}`);
+            const group = document.createElement('div');
+            group.className = 'exercise-group';
+            group.innerHTML = `
             <button class="btn btn-del" onclick="this.parentElement.remove()">Eliminar</button>
             <div class="rows-holder">${createExRowHTML()}</div>
             <button class="btn btn-biserie" onclick="toBiserie(this)">➕ Agregar Biserie</button>
             <div style="text-align:center; color:var(--gold); font-weight:bold; font-size:11px; margin-top:15px;">⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE</div>
         `;
-        list.appendChild(group);
-    }
-
-    function createExRowHTML() {
-        let opts = '<option value="">- Seleccionar -</option>';
-        for(let cat in EXERCISES_DB) {
-            opts += `<optgroup label="${cat}">`;
-            EXERCISES_DB[cat].forEach(ex => opts += `<option value="${ex}">${ex}</option>`);
-            opts += `</optgroup>`;
+            list.appendChild(group);
         }
-        return `
+
+        function createExRowHTML() {
+            let opts = '<option value="">- Seleccionar -</option>';
+            for (let cat in EXERCISES_DB) {
+                opts += `<optgroup label="${cat}">`;
+                EXERCISES_DB[cat].forEach(ex => opts += `<option value="${ex}">${ex}</option>`);
+                opts += `</optgroup>`;
+            }
+            return `
             <div class="exercise-sub-row">
                 <div class="field"><label>EJERCICIO</label><select class="sel-name" onchange="toggleCardio(this)">${opts}</select></div>
                 <div class="field">
@@ -151,71 +331,71 @@
                 <div class="field"><label>NOTAS DEL COACH</label><textarea class="sel-note" rows="3"></textarea></div>
                 <div class="img-upload-big"><span>+ Foto</span><input type="file" accept="image/*" onchange="handleImg(this)"><img src="" style="display:none"></div>
             </div>`;
-    }
+        }
 
-    function toggleCardio(select) {
-        const isCardio = EXERCISES_DB["CARDIO"].includes(select.value);
-        const metricDiv = select.closest('.exercise-sub-row').querySelector('.metric-split');
-        if(isCardio) {
-            metricDiv.innerHTML = `<div class="metric-field"><label>TIEMPO (MIN)</label><input type="text" class="m-series" style="width:100px" placeholder="00"><input type="hidden" class="m-reps" value="MIN"></div>`;
-        } else {
-            metricDiv.innerHTML = `
+        function toggleCardio(select) {
+            const isCardio = EXERCISES_DB["CARDIO"].includes(select.value);
+            const metricDiv = select.closest('.exercise-sub-row').querySelector('.metric-split');
+            if (isCardio) {
+                metricDiv.innerHTML = `<div class="metric-field"><label>TIEMPO (MIN)</label><input type="text" class="m-series" style="width:100px" placeholder="00"><input type="hidden" class="m-reps" value="MIN"></div>`;
+            } else {
+                metricDiv.innerHTML = `
                 <div class="metric-field"><label>SERIES</label><input type="text" class="m-series" placeholder="S"></div>
                 <div class="metric-field"><label>REPS</label><input type="text" class="m-reps" placeholder="R"></div>`;
+            }
         }
-    }
 
-    function toBiserie(btn) {
-        const holder = btn.parentElement.querySelector('.rows-holder');
-        if(holder.children.length < 2) {
-            holder.insertAdjacentHTML('beforeend', createExRowHTML());
-            btn.style.display = 'none';
+        function toBiserie(btn) {
+            const holder = btn.parentElement.querySelector('.rows-holder');
+            if (holder.children.length < 2) {
+                holder.insertAdjacentHTML('beforeend', createExRowHTML());
+                btn.style.display = 'none';
+            }
         }
-    }
 
-    function handleImg(input) {
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = input.nextElementSibling;
-                img.src = e.target.result;
-                img.style.display = 'block';
-                input.previousElementSibling.style.display = 'none';
+        function handleImg(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = input.nextElementSibling;
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    input.previousElementSibling.style.display = 'none';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function generateClientPortal() {
+            const athlete = {
+                name: document.getElementById('p_name').value || 'Atleta',
+                goal: document.getElementById('p_goal').value,
+                weight: document.getElementById('p_weight').value,
+                days: []
             };
-            reader.readAsDataURL(input.files[0]);
-        }
-    }
 
-    function generateClientPortal() {
-        const athlete = {
-            name: document.getElementById('p_name').value || 'Atleta',
-            goal: document.getElementById('p_goal').value,
-            weight: document.getElementById('p_weight').value,
-            days: []
-        };
-
-        document.querySelectorAll('.day-container').forEach(dayBox => {
-            const dayName = dayBox.querySelector('.day-header').innerText.split('+')[0].trim();
-            const groups = [];
-            dayBox.querySelectorAll('.exercise-group').forEach(group => {
-                const subRows = [];
-                group.querySelectorAll('.exercise-sub-row').forEach(row => {
-                    subRows.push({
-                        name: row.querySelector('.sel-name').value,
-                        series: row.querySelector('.m-series').value,
-                        reps: row.querySelector('.m-reps').value,
-                        note: row.querySelector('.sel-note').value,
-                        img: row.querySelector('img').src
+            document.querySelectorAll('.day-container').forEach(dayBox => {
+                const dayName = dayBox.querySelector('.day-header').innerText.split('+')[0].trim();
+                const groups = [];
+                dayBox.querySelectorAll('.exercise-group').forEach(group => {
+                    const subRows = [];
+                    group.querySelectorAll('.exercise-sub-row').forEach(row => {
+                        subRows.push({
+                            name: row.querySelector('.sel-name').value,
+                            series: row.querySelector('.m-series').value,
+                            reps: row.querySelector('.m-reps').value,
+                            note: row.querySelector('.sel-note').value,
+                            img: row.querySelector('img').src
+                        });
                     });
+                    groups.push(subRows);
                 });
-                groups.push(subRows);
+                athlete.days.push({ name: dayName, content: groups });
             });
-            athlete.days.push({ name: dayName, content: groups });
-        });
 
-        let routineHtml = '';
-        athlete.days.forEach(day => {
-            routineHtml += `
+            let routineHtml = '';
+            athlete.days.forEach(day => {
+                routineHtml += `
                 <div class="client-day-header">
                     <span>${day.name}</span>
                     <span class="day-contact">
@@ -224,27 +404,27 @@
                         3013806239
                     </span>
                 </div>`;
-            day.content.forEach(group => {
-                const isBis = group.length > 1;
-                routineHtml += `<div class="client-ex-card ${isBis ? 'biserie-card' : ''}">`;
-                if(isBis) routineHtml += `<div class="biserie-tag">BISERIE (A + B)</div>`;
-                group.forEach((ex, idx) => {
-                    const metricText = ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series} Series x ${ex.reps} Reps`;
-                    routineHtml += `
+                day.content.forEach(group => {
+                    const isBis = group.length > 1;
+                    routineHtml += `<div class="client-ex-card ${isBis ? 'biserie-card' : ''}">`;
+                    if (isBis) routineHtml += `<div class="biserie-tag">BISERIE (A + B)</div>`;
+                    group.forEach((ex, idx) => {
+                        const metricText = ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series} Series x ${ex.reps} Reps`;
+                        routineHtml += `
                         <div class="client-row">
                             <div class="client-info">
-                                <div class="client-ex-name">${isBis ? (idx===0?'A. ':'B. ') : ''}${ex.name}</div>
+                                <div class="client-ex-name">${isBis ? (idx === 0 ? 'A. ' : 'B. ') : ''}${ex.name}</div>
                                 <div class="client-metric">${metricText}</div>
                                 <div class="client-note">${ex.note}</div>
                             </div>
                             <div class="client-img-large">${ex.img ? `<img src="${ex.img}">` : ''}</div>
                         </div>`;
+                    });
+                    routineHtml += `<div class="client-rest-bar">⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE</div></div>`;
                 });
-                routineHtml += `<div class="client-rest-bar">⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE</div></div>`;
             });
-        });
 
-        const finalTemplate = `
+            const finalTemplate = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -321,13 +501,14 @@
 </body>
 </html>`;
 
-        const blob = new Blob([finalTemplate], { type: 'text/html' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `Plan_BODYBYJA_${athlete.name.replace(/ /g,'_')}.html`;
-        a.click();
-    }
-</script>
+            const blob = new Blob([finalTemplate], { type: 'text/html' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `Plan_BODYBYJA_${athlete.name.replace(/ /g, '_')}.html`;
+            a.click();
+        }
+    </script>
 
 </body>
+
 </html>
