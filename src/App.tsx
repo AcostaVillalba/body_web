@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { EXERCISES_DB, getImageUrl } from './data';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 import './App.css';
 
 interface ExerciseSubRow {
@@ -28,6 +30,9 @@ interface Athlete {
   age: string;
   weight: string;
   goal: string;
+  planType: string;
+  startDate: string;
+  controlDate: string;
 }
 
 function App() {
@@ -36,7 +41,14 @@ function App() {
     id: '',
     age: '',
     weight: '',
-    goal: 'Definición Muscular'
+    goal: 'Definición Muscular',
+    planType: 'Mensual',
+    startDate: new Date().toISOString().split('T')[0],
+    controlDate: (() => {
+      const d = new Date();
+      d.setMonth(d.getMonth() + 1);
+      return d.toISOString().split('T')[0];
+    })()
   });
 
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -163,6 +175,14 @@ function App() {
       }
     };
 
+    const formatDate = (dateStr: string) => {
+      if (!dateStr) return '';
+      const [year, month, day] = dateStr.split('-');
+      return `${day}/${month}/${year}`;
+    };
+
+    const controlDateFormatted = formatDate(athlete.controlDate);
+
     let routineHtml = '';
 
     for (const day of routineDays) {
@@ -242,11 +262,11 @@ function App() {
         .stat-label { font-size: 11px; color: var(--primary); font-weight: 700; letter-spacing: 1px;}
         .stat-val { font-size: 16px; font-weight: 900;}
 
-        .client-day-header { background: #111; color: var(--primary); padding: 20px 40px; font-size: 24px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-top: 40px; text-transform: uppercase;}
+        .client-day-header { page-break-before: always; break-before: page; background: #111; color: var(--primary); padding: 20px 40px; font-size: 24px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-top: 40px; text-transform: uppercase;}
         .day-contact { font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; letter-spacing: 1px;}
         
         .day-groups-container { padding: 30px 40px; background: #fff;}
-        .client-ex-card { background: #fff; border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow: hidden;}
+        .client-ex-card { page-break-inside: avoid; break-inside: avoid; background: #fff; border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow: hidden;}
         .biserie-card { border: 2px solid var(--primary); box-shadow: 0 8px 20px rgba(197, 160, 33, 0.12); }
         .biserie-tag { background: var(--primary); color: #fff; text-align: center; padding: 10px; font-weight: 900; font-size: 13px; letter-spacing: 2px;}
         
@@ -262,7 +282,7 @@ function App() {
         
         .client-rest-bar { background: #111; color: var(--primary); text-align: center; padding: 15px; font-weight: 800; font-size: 14px; letter-spacing: 2px;}
         
-        .footer-premium { background: #111; color: #fff; padding: 60px 40px; position: relative; border-top: 8px solid var(--primary);}
+        .footer-premium { page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; background: #111; color: #fff; padding: 60px 40px; position: relative; border-top: 8px solid var(--primary);}
         .footer-premium h3 { color: var(--primary); text-transform: uppercase; margin-top: 0; font-size: 22px; font-weight: 900; margin-bottom: 30px;}
         .recommendations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 14px; color: #ddd; line-height: 1.6;}
         .rec-item strong { display: block; margin-bottom: 5px; color: var(--primary); font-size: 15px;}
@@ -298,6 +318,9 @@ function App() {
         </div>
 
         <div class="stats-bar">
+            <div class="stat-item"><span class="stat-label">FECHA DE INICIO</span><span class="stat-val">${formatDate(athlete.startDate)}</span></div>
+            <div class="stat-item"><span class="stat-label">FECHA DE CONTROL</span><span class="stat-val" style="color:var(--primary)">${controlDateFormatted}</span></div>
+            <div class="stat-item"><span class="stat-label">TIPO DE PLAN</span><span class="stat-val">${athlete.planType || 'Mensual'}</span></div>
             <div class="stat-item"><span class="stat-label">OBJETIVO PRINCIPAL</span><span class="stat-val">${athlete.goal}</span></div>
             <div class="stat-item"><span class="stat-label">PESO</span><span class="stat-val">${athlete.weight || '--'} KG</span></div>
         </div>
@@ -323,13 +346,31 @@ function App() {
 </body>
 </html>`;
 
-    const blob = new Blob([finalTemplate], { type: 'text/html' });
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = `Plan_BODYBYJA_${(athlete.name || 'Atleta').replace(/ /g, '_')}.html`;
-    a.click();
-    URL.revokeObjectURL(objectUrl);
+    // Backup Data: Enviar datos al backend
+    try {
+      await fetch('http://localhost:8000/api/save-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(athlete)
+      });
+    } catch (err) {
+      console.warn("Backend local apagado o inaccesible, continuando con descarga PDF...", err);
+    }
+
+    // Convertir el HTML a PDF usando html2pdf
+    const element = document.createElement('div');
+    element.innerHTML = finalTemplate;
+
+    const opt = {
+      margin: [0.4, 0, 0.4, 0] as [number, number, number, number], // Margen superior e inferior para evitar cortes bruscos
+      filename: `Plan_BODYBYJA_${(athlete.name || 'Atleta').replace(/ /g, '_')}.pdf`,
+      image: { type: 'jpeg', quality: 1 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] }
+    };
+
+    html2pdf().set(opt as any).from(element).save();
   };
 
   return (
@@ -365,6 +406,32 @@ function App() {
             <option>Mantenimiento Físico</option>
             <option>Recomposicion Corporal</option>
           </select>
+        </div>
+        <div className="field">
+          <label>Tipo de Plan</label>
+          <select value={athlete.planType} onChange={e => setAthlete({ ...athlete, planType: e.target.value })}>
+            <option value="Mensual">Mensual</option>
+            <option value="Dos meses">Dos meses</option>
+            <option value="Trimestral">Trimestral</option>
+          </select>
+        </div>
+        <div className="field">
+          <label>Fecha de Inicio</label>
+          <input
+            type="date"
+            value={athlete.startDate}
+            onChange={e => {
+              const newStart = e.target.value;
+              const d = new Date(newStart + 'T12:00:00');
+              d.setMonth(d.getMonth() + 1);
+              const newControl = d.toISOString().split('T')[0];
+              setAthlete({ ...athlete, startDate: newStart, controlDate: newControl });
+            }}
+          />
+        </div>
+        <div className="field">
+          <label>Fecha de Control (Auto)</label>
+          <input type="date" value={athlete.controlDate} readOnly style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }} />
         </div>
       </div>
 
