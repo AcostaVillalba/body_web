@@ -186,19 +186,22 @@ function App() {
     let routineHtml = '';
 
     for (const day of routineDays) {
+      let groupCounter = 1;
       routineHtml += `
             <div class="client-day-header">
                 <span>${day.name}</span>
                 <span class="day-contact">
-                    <svg viewBox="0 0 24 24" width="16" style="vertical-align:middle; margin-right:5px;"><path fill="#c5a021" d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
+                    <svg viewBox="0 0 24 24" width="16" style="vertical-align:middle; margin-right:5px;"><path fill="#fff" d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
                     @juancarlosgc03_18 | 3013806239
                 </span>
             </div>
             <div class="day-groups-container">`;
 
+      const dayPrefix = day.name.substring(0, 3).toUpperCase();
       for (const group of day.groups) {
         const isBis = group.exercises.length > 1;
-        routineHtml += `<div class="client-ex-card ${isBis ? 'biserie-card' : ''}">`;
+        routineHtml += `<div class="client-ex-card ${isBis ? 'biserie-card' : ''}">
+                        <div class="ex-number-badge">${dayPrefix} | EJERCICIO #${groupCounter++}</div>`;
         if (isBis) routineHtml += `<div class="biserie-tag">BISERIE (A + B) / EN SUPER SERIE</div>`;
 
         for (let idx = 0; idx < group.exercises.length; idx++) {
@@ -243,50 +246,57 @@ function App() {
         body { font-family: 'Montserrat', sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; padding: 20px; line-height: 1.6; }
         .wrapper { max-width: 900px; margin: 0 auto; background: var(--bg-card); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding-bottom: 0;}
         
-        .top-banner { background: #111; color: #fff; padding: 50px 20px; text-align:center; position: relative;}
+        .top-banner { background: #111; color: #fff; padding: 60px 20px; text-align:center; position: relative;}
         .top-banner::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #c5a021, #f5d76e, #c5a021); }
-        .brand-logo { margin:0; font-size:48px; font-weight:900; letter-spacing: -1px;}
-        .brand-subtitle { margin:0; font-size:13px; font-weight:700; letter-spacing:4px; color: var(--primary); text-transform: uppercase; margin-top: 10px;}
+        .top-header h1 { margin: 0; font-size: 61px; font-weight: 900; letter-spacing: 2px;}
+        .brand-subtitle { margin:0; font-size:14px; font-weight:700; letter-spacing:4px; color: var(--primary); text-transform: uppercase; margin-top: 10px;}
         
-        .intro-box { padding: 40px; border-bottom: 1px solid var(--border-color); }
+        .intro-box { padding: 50px 40px; border-bottom: 1px solid var(--border-color); }
         .intro-box h2 { color: var(--primary); margin-top:0; font-size: 26px; font-weight: 900; text-transform: uppercase;}
-        .intro-box p { font-size: 15px; color: var(--text-muted); text-align: justify; margin-bottom: 0;}
+        .intro-box p { font-size: 16px; color: var(--text-muted); text-align: justify; margin-bottom: 0;}
 
         .mv-grid { display: flex; gap: 30px; padding: 40px; background: #fafafa; border-bottom: 1px solid var(--border-color);}
         .mv-box { flex: 1; border-left: 4px solid var(--primary); padding-left: 20px; }
-        .mv-box h4 { margin-top: 0; color: #111; font-weight: 900; letter-spacing: 1px; margin-bottom: 10px;}
-        .mv-box p { font-size: 13px; color: var(--text-muted); margin: 0; }
+        .mv-box h4 { margin-top: 0; color: var(--primary); font-weight: 900; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase;}
+        .mv-box p { font-size: 15px; color: var(--text-muted); margin: 0; }
         
-        .stats-bar { margin: 30px 40px; background:#111; color: #fff; padding:20px 30px; border-radius:12px; display:flex; justify-content:space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);}
+        .stats-bar { margin: 30px 40px; background:#fff; color: #111; padding:20px 30px; border-radius:12px; display:flex; justify-content:space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 4px solid #71a5cb;}
         .stat-item { display: flex; flex-direction: column; gap: 5px;}
         .stat-label { font-size: 11px; color: var(--primary); font-weight: 700; letter-spacing: 1px;}
-        .stat-val { font-size: 16px; font-weight: 900;}
+        .stat-val { font-size: 16px; font-weight: 400; color: #111;}
 
-        .client-day-header { page-break-before: always; break-before: page; background: #111; color: var(--primary); padding: 20px 40px; font-size: 24px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-top: 40px; text-transform: uppercase;}
+        .client-day-header { page-break-before: always; break-before: page; background: var(--primary); color: #fff; padding: 20px 40px; font-size: 24px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-top: 40px; text-transform: uppercase;}
         .day-contact { font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; letter-spacing: 1px;}
         
-        .day-groups-container { padding: 30px 40px; background: #fff;}
-        .client-ex-card { page-break-inside: avoid; break-inside: avoid; background: #fff; border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow: hidden;}
+        .day-groups-container { padding: 40px 40px; background: #fff;}
+        .client-ex-card { position: relative; page-break-inside: avoid; break-inside: avoid; background: #fff; border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 35px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow: hidden;}
+        .ex-number-badge { position: absolute; top: 0; left: 0; background: #f84a4aff; color: #fff; padding: 0 20px; height: 34px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; border-bottom-right-radius: 17px; z-index: 10; border-right: 1px solid #991b1b; border-bottom: 1px solid #991b1b; letter-spacing: 1px; text-transform: uppercase; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);}
         .biserie-card { border: 2px solid var(--primary); box-shadow: 0 8px 20px rgba(197, 160, 33, 0.12); }
         .biserie-tag { background: var(--primary); color: #fff; text-align: center; padding: 10px; font-weight: 900; font-size: 13px; letter-spacing: 2px;}
         
         .client-row { display: flex; padding: 30px; border-bottom: 1px solid var(--border-color); gap: 40px; align-items: center; }
         .client-row:last-child { border-bottom: none; }
-        .client-info { flex: 1; }
+        .client-info { flex: 1; min-width: 0; }
         .client-ex-name { font-weight: 900; font-size: 22px; color: #111; margin-bottom: 15px; text-transform: uppercase; line-height: 1.2;}
         .client-metric { display: inline-block; background: #fdfaf0; border: 1px solid #f2e3b3; color: #a38210; padding: 10px 20px; border-radius: 30px; font-weight: 800; font-size: 15px; margin-bottom: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);}
-        .client-note { font-size: 14px; color: #444; background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary); font-weight: 500;}
+        .client-note { font-size: 14px; color: #444; background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary); font-weight: 500; word-wrap: break-word; overflow-wrap: break-word; white-space: pre-line;}
         
         .client-img-large { flex-shrink: 0; width: 260px; height: 190px; border-radius: 12px; overflow: hidden; box-shadow: 0 6px 15px rgba(0,0,0,0.08); background: #f0f0f0; border: 1px solid #eee;}
         .client-img-large img { width: 100%; height: 100%; object-fit: cover; display: block; }
         
-        .client-rest-bar { background: #111; color: var(--primary); text-align: center; padding: 15px; font-weight: 800; font-size: 14px; letter-spacing: 2px;}
+        .client-rest-bar { background: #71a5cbff; color: #f1f5f9; text-align: center; padding: 15px; font-weight: 800; font-size: 14px; letter-spacing: 2px; border-top: 2px solid var(--primary);}
         
-        .footer-premium { page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; background: #111; color: #fff; padding: 60px 40px; position: relative; border-top: 8px solid var(--primary);}
-        .footer-premium h3 { color: var(--primary); text-transform: uppercase; margin-top: 0; font-size: 22px; font-weight: 900; margin-bottom: 30px;}
-        .recommendations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 14px; color: #ddd; line-height: 1.6;}
-        .rec-item strong { display: block; margin-bottom: 5px; color: var(--primary); font-size: 15px;}
-        .contact-reminder { margin-top: 50px; text-align: center; background: rgba(197, 160, 33, 0.15); border: 1px solid var(--primary); color: #fff; padding: 25px; border-radius: 16px; font-weight: 700; letter-spacing: 1px; font-size: 15px;}
+        .recommendations-section { page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; background: #fff; color: #111; padding: 60px 40px; position: relative; border-top: 8px solid var(--primary);}
+        .recommendations-section h3 { color: #b91b1b; text-transform: uppercase; margin-top: 0; font-size: 22px; font-weight: 900; margin-bottom: 30px; text-align: center;}
+        .recommendations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 16px; color: #444; line-height: 1.6;}
+        .rec-item strong { display: block; margin-bottom: 5px; color: #71a5cb; font-size: 17px;}
+        .contact-reminder { margin-top: 50px; text-align: center; background: rgba(248, 74, 74, 0.05); border: 2px solid #f84a4a; color: #111; padding: 25px; border-radius: 16px; font-weight: 700; letter-spacing: 1px; font-size: 17px;}
+        
+        .footer-black { background: #111; color: #fff; padding: 50px 40px; position: relative; border-top: 2px solid #333;}
+        .coach-contact-section { text-align: center; }
+        .coach-contact-section h4 { color: var(--primary); text-transform: uppercase; margin-bottom: 15px; font-size: 18px; font-weight: 900;}
+        .contact-details { display: flex; justify-content: center; gap: 40px; font-weight: 700; font-size: 16px;}
+        .contact-link { color: #fff; text-decoration: none; display: flex; align-items: center; gap: 10px; }
         
         @media (max-width: 768px) {
            .mv-grid { flex-direction: column; }
@@ -309,7 +319,7 @@ function App() {
 
         <div class="intro-box">
             <h2>¡Hola, ${athlete.name || 'Atleta'}!</h2>
-            <p><strong>Soy Juan Carlos González, TU Entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida. Juntos, superaremos cualquier obstáculo y celebraremos cada victoria, por pequeña que sea.</p>
+            <p><strong>Soy Juan Carlos González, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida. Juntos, superaremos cualquier obstáculo y celebraremos cada victoria, por pequeña que sea.</p>
         </div>
 
         <div class="mv-grid">
@@ -319,7 +329,7 @@ function App() {
 
         <div class="stats-bar">
             <div class="stat-item"><span class="stat-label">FECHA DE INICIO</span><span class="stat-val">${formatDate(athlete.startDate)}</span></div>
-            <div class="stat-item"><span class="stat-label">FECHA DE CONTROL</span><span class="stat-val" style="color:var(--primary)">${controlDateFormatted}</span></div>
+            <div class="stat-item"><span class="stat-label">FECHA DE CONTROL</span><span class="stat-val">${controlDateFormatted}</span></div>
             <div class="stat-item"><span class="stat-label">TIPO DE PLAN</span><span class="stat-val">${athlete.planType || 'Mensual'}</span></div>
             <div class="stat-item"><span class="stat-label">OBJETIVO PRINCIPAL</span><span class="stat-val">${athlete.goal}</span></div>
             <div class="stat-item"><span class="stat-label">PESO</span><span class="stat-val">${athlete.weight || '--'} KG</span></div>
@@ -327,7 +337,7 @@ function App() {
 
         ${routineHtml}
 
-        <div class="footer-premium">
+        <div class="recommendations-section">
             <h3>Protocolo de Reglas y Recomendaciones</h3>
             <div class="recommendations-grid">
                 <div class="rec-item"><strong>1. Calentamiento Activo</strong>Realiza 10 minutos de movilidad articular enfocada en los grupos musculares del día antes de comenzar.</div>
@@ -340,6 +350,22 @@ function App() {
 
             <div class="contact-reminder">
                 ⚠️ Ante cualquier molestia importante o duda técnica, detén el ejercicio y envíame un mensaje de inmediato, con gusto te ayudo a resolverlo. ⚠️
+            </div>
+        </div>
+
+        <div class="footer-black">
+            <div class="coach-contact-section">
+                <h4>Juan Carlos Gonzalez</h4>
+                <div class="contact-details">
+                    <div class="contact-link">
+                        <svg viewBox="0 0 24 24" width="20" fill="currentColor"><path d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
+                        3013806239
+                    </div>
+                    <div class="contact-link">
+                        <svg viewBox="0 0 24 24" width="20" fill="currentColor"><path d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M18,4.5A1.5,1.5 0 1,0 19.5,6A1.5,1.5 0 0,0 18,4.5Z"/></svg>
+                        @juancarlosgc03_18
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -360,17 +386,88 @@ function App() {
     // Convertir el HTML a PDF usando html2pdf
     const element = document.createElement('div');
     element.innerHTML = finalTemplate;
+    // IMPORTANTE: Añadir temporalmente al DOM (invisible) para poder medir posiciones
+    element.style.position = 'absolute';
+    element.style.left = '-9999px';
+    element.style.top = '0';
+    element.style.width = '900px'; // Mismo ancho que .wrapper
+    document.body.appendChild(element);
+
+    // Obtener las posiciones de los encabezados de día para saber en qué página van
+    const dayHeaders = Array.from(element.querySelectorAll('.client-day-header'));
+    const dayPositions = dayHeaders.map(h => ({
+      name: (h as HTMLElement).innerText.trim(),
+      y: (h as HTMLElement).offsetTop
+    }));
 
     const opt = {
-      margin: [0.4, 0, 0.4, 0] as [number, number, number, number], // Margen superior e inferior para evitar cortes bruscos
+      margin: [0.4, 0, 0.4, 0] as [number, number, number, number],
       filename: `Plan_BODYBYJA_${(athlete.name || 'Atleta').replace(/ /g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 1 },
+      image: { type: 'jpeg' as const, quality: 1 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] }
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' as const },
+      pagebreak: { mode: ['css', 'legacy'] as any }
     };
 
-    html2pdf().set(opt as any).from(element).save();
+    // Iniciar el proceso con html2pdf
+    const worker = html2pdf().from(element).set(opt);
+    
+    // Hook para añadir la franja sutil en cada página después de generar el PDF pero antes de guardar
+    worker.toPdf().get('pdf').then((pdf: any) => {
+      const totalPages = pdf.internal.getNumberOfPages();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      
+      const canvasHeightPx = element.scrollHeight;
+
+      for (let i = 1; i <= totalPages; i++) {
+        // Ignorar la primera página (Banner superior/Misión/Visión)
+        if (i === 1) continue;
+
+        pdf.setPage(i);
+        
+        const currentYPx = (i - 1) * (canvasHeightPx / totalPages);
+        let activeDay = "";
+        for (const pos of dayPositions) {
+          if (pos.y <= (currentYPx + 100)) { 
+            activeDay = pos.name;
+          }
+        }
+
+        if (activeDay) {
+          // Dibujar franja sutil (Dorado translúcido)
+          pdf.setDrawColor(197, 160, 33);
+          pdf.setFillColor(197, 160, 33);
+          
+          // Intentar usar GState para opacidad si está disponible
+          try {
+            pdf.setGState(new (pdf as any).GState({ opacity: 0.4 }));
+          } catch(e) {
+            // Fallback a un color más claro si GState falla
+            pdf.setFillColor(235, 215, 150); 
+          }
+          
+          const barHeight = 0.25;
+          const barY = 0.08; 
+          
+          pdf.rect(0, barY, pageWidth, barHeight, 'F');
+          
+          try {
+            pdf.setGState(new (pdf as any).GState({ opacity: 1 }));
+          } catch(e) {}
+
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(10);
+          pdf.setFont("helvetica", "bold");
+          pdf.text(`${activeDay.toUpperCase()} | @JUANCARLOSGC03_18`, pageWidth / 2, barY + (barHeight / 2) + 0.04, { align: 'center' });
+        }
+      }
+      
+      // Limpiar el DOM temporal
+      document.body.removeChild(element);
+    }).then(() => {
+      // Guardar el PDF después de las modificaciones
+      worker.save();
+    });
   };
 
   return (
