@@ -54,7 +54,10 @@ function App() {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [routineDays, setRoutineDays] = useState<RoutineDay[]>([]);
 
-  const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+  
+  // Consolidate all exercises for the search datalist
+  const allExercises = Object.values(EXERCISES_DB).flat().sort();
 
   const handleDayToggle = (day: string) => {
     setSelectedDays(prev =>
@@ -68,6 +71,7 @@ function App() {
       const existing = routineDays.find(d => d.name === dayName);
       return existing || { name: dayName, groups: [] };
     });
+    newRoutineDays.sort((a, b) => daysOfWeek.indexOf(a.name) - daysOfWeek.indexOf(b.name));
     setRoutineDays(newRoutineDays);
   };
 
@@ -183,23 +187,48 @@ function App() {
 
     const controlDateFormatted = formatDate(athlete.controlDate);
 
+    const getDayAbbr = (dayName: string) => {
+      const dayMap: { [key: string]: string } = {
+        "Lunes": "LUN", "Martes": "MAR", "Miércoles": "MIÉ", "Jueves": "JUE", "Viernes": "VIE", "Sábado": "SÁB", "Domingo": "DOM"
+      };
+      return dayMap[dayName] || dayName.substring(0, 3).toUpperCase();
+    };
+
     let routineHtml = '';
 
     for (const day of routineDays) {
+      const dayAbbr = getDayAbbr(day.name);
+      let dayExIdx = 0;
+
       routineHtml += `
-            <div class="client-day-header">
-                <span>${day.name}</span>
-                <span class="day-contact">
-                    <svg viewBox="0 0 24 24" width="16" style="vertical-align:middle; margin-right:5px;"><path fill="#c5a021" d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
+        <table class="day-table-master" style="width:100%; border-collapse:collapse; page-break-before:always; break-before:page;">
+          <thead>
+            <tr>
+              <td style="padding:0; border:none;">
+                <div class="client-day-header">
+                  <span>${day.name}</span>
+                  <span class="day-contact">
+                    <svg viewBox="0 0 24 24" width="16" style="vertical-align:middle; margin-right:5px;"><path fill="white" d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
                     @juancarlosgc03_18 | 3013806239
-                </span>
-            </div>
-            <div class="day-groups-container">`;
+                  </span>
+                </div>
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:0; border:none;">
+                <div class="day-groups-container">`;
 
       for (const group of day.groups) {
+        dayExIdx++;
         const isBis = group.exercises.length > 1;
-        routineHtml += `<div class="client-ex-card ${isBis ? 'biserie-card' : ''}">`;
-        if (isBis) routineHtml += `<div class="biserie-tag">BISERIE (A + B) / EN SUPER SERIE</div>`;
+        routineHtml += `
+          <div class="client-ex-card ${isBis ? 'biserie-card' : ''}">
+            <div class="card-header-bar">
+                <div class="ex-number-tag">${dayAbbr} | EJERCICIO #${dayExIdx}</div>
+                ${isBis ? `<div class="biserie-tag">BISERIE (A + B) / EN SUPER SERIE</div>` : ''}
+            </div>`;
 
         for (let idx = 0; idx < group.exercises.length; idx++) {
           const ex = group.exercises[idx];
@@ -221,7 +250,7 @@ function App() {
         }
         routineHtml += `<div class="client-rest-bar">⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE</div></div>`;
       }
-      routineHtml += `</div>`;
+      routineHtml += `</div></td></tr></tbody></table>`;
     }
 
     const finalTemplate = `
@@ -239,6 +268,7 @@ function App() {
             --text-main: #111111;
             --text-muted: #555555;
             --border-color: #e2e8f0;
+            --blue: #71a5cb;
         }
         body { font-family: 'Montserrat', sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; padding: 20px; line-height: 1.6; }
         .wrapper { max-width: 900px; margin: 0 auto; background: var(--bg-card); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding-bottom: 0;}
@@ -252,41 +282,81 @@ function App() {
         .intro-box h2 { color: var(--primary); margin-top:0; font-size: 26px; font-weight: 900; text-transform: uppercase;}
         .intro-box p { font-size: 15px; color: var(--text-muted); text-align: justify; margin-bottom: 0;}
 
-        .mv-grid { display: flex; gap: 30px; padding: 40px; background: #fafafa; border-bottom: 1px solid var(--border-color);}
-        .mv-box { flex: 1; border-left: 4px solid var(--primary); padding-left: 20px; }
-        .mv-box h4 { margin-top: 0; color: #111; font-weight: 900; letter-spacing: 1px; margin-bottom: 10px;}
-        .mv-box p { font-size: 13px; color: var(--text-muted); margin: 0; }
+        .mv-grid { display: flex; gap: 50px; padding: 40px 60px; background: #fcfcfc; border-bottom: 1px solid var(--border-color);}
+        .mv-box { flex: 1; border-left: 6px solid var(--primary); padding-left: 25px; }
+        .mv-box h4 { margin: 0 0 15px; color: var(--primary); font-weight: 900; letter-spacing: 1px; font-size: 18px; text-transform: uppercase;}
+        .mv-box p { font-size: 14px; color: var(--text-muted); margin: 0; line-height: 1.6; }
         
-        .stats-bar { margin: 30px 40px; background:#111; color: #fff; padding:20px 30px; border-radius:12px; display:flex; justify-content:space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);}
-        .stat-item { display: flex; flex-direction: column; gap: 5px;}
-        .stat-label { font-size: 11px; color: var(--primary); font-weight: 700; letter-spacing: 1px;}
-        .stat-val { font-size: 16px; font-weight: 900;}
+        .stats-bar { margin: 40px 50px; background:#fff; color: #111; padding:30px; border-radius:18px; display:flex; justify-content:space-between; align-items: center; border: 4px solid #71a5cb;}
+        .stat-item { display: flex; flex-direction: column; gap: 8px; text-align: center;}
+        .stat-label { font-size: 12px; color: var(--primary); font-weight: 800; letter-spacing: 1px;}
+        .stat-val { font-size: 18px; font-weight: 400; color: #333;}
 
-        .client-day-header { page-break-before: always; break-before: page; background: #111; color: var(--primary); padding: 20px 40px; font-size: 24px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-top: 40px; text-transform: uppercase;}
+        .day-table-master thead { display: table-header-group; }
+        .client-day-header { background: var(--primary); color: #fff; padding: 10px 40px; font-size: 18px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; text-transform: uppercase;}
         .day-contact { font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; letter-spacing: 1px;}
         
         .day-groups-container { padding: 30px 40px; background: #fff;}
-        .client-ex-card { page-break-inside: avoid; break-inside: avoid; background: #fff; border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow: hidden;}
+        
+        .client-ex-card { page-break-inside: avoid; break-inside: avoid; background: #fff; border: 2px solid var(--primary); border-radius: 16px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow: hidden;}
         .biserie-card { border: 2px solid var(--primary); box-shadow: 0 8px 20px rgba(197, 160, 33, 0.12); }
-        .biserie-tag { background: var(--primary); color: #fff; text-align: center; padding: 10px; font-weight: 900; font-size: 13px; letter-spacing: 2px;}
+        
+        .card-header-bar { display: flex; align-items: stretch; height: 40px; }
+        .ex-number-tag { background: #ef4444; color: #fff; padding: 0 20px; font-weight: 900; font-size: 12px; display: flex; align-items: center; border-radius: 0 0 15px 0; letter-spacing: 1px;}
+        .biserie-tag { background: var(--primary); color: #fff; flex: 1; padding: 10px; font-weight: 900; font-size: 13px; letter-spacing: 1.5px; display: flex; align-items: center; justify-content: center;}
         
         .client-row { display: flex; padding: 30px; border-bottom: 1px solid var(--border-color); gap: 40px; align-items: center; }
         .client-row:last-child { border-bottom: none; }
-        .client-info { flex: 1; }
+        .client-info { flex: 1; min-width: 0; }
         .client-ex-name { font-weight: 900; font-size: 22px; color: #111; margin-bottom: 15px; text-transform: uppercase; line-height: 1.2;}
         .client-metric { display: inline-block; background: #fdfaf0; border: 1px solid #f2e3b3; color: #a38210; padding: 10px 20px; border-radius: 30px; font-weight: 800; font-size: 15px; margin-bottom: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);}
-        .client-note { font-size: 14px; color: #444; background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary); font-weight: 500;}
+        .client-note { font-size: 14px; color: #444; background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary); font-weight: 500; word-wrap: break-word; overflow-wrap: anywhere;}
         
-        .client-img-large { flex-shrink: 0; width: 260px; height: 190px; border-radius: 12px; overflow: hidden; box-shadow: 0 6px 15px rgba(0,0,0,0.08); background: #f0f0f0; border: 1px solid #eee;}
+        .client-img-large { flex-shrink: 0; width: 260px; height: 190px; border-radius: 12px; overflow: hidden; background: transparent;}
         .client-img-large img { width: 100%; height: 100%; object-fit: cover; display: block; }
         
-        .client-rest-bar { background: #111; color: var(--primary); text-align: center; padding: 15px; font-weight: 800; font-size: 14px; letter-spacing: 2px;}
+        .client-rest-bar { background: var(--blue); color: #fff; text-align: center; padding: 15px; font-weight: 800; font-size: 14px; letter-spacing: 2px;}
         
-        .footer-premium { page-break-before: always; break-before: page; page-break-inside: avoid; break-inside: avoid; background: #111; color: #fff; padding: 60px 40px; position: relative; border-top: 8px solid var(--primary);}
-        .footer-premium h3 { color: var(--primary); text-transform: uppercase; margin-top: 0; font-size: 22px; font-weight: 900; margin-bottom: 30px;}
-        .recommendations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 14px; color: #ddd; line-height: 1.6;}
-        .rec-item strong { display: block; margin-bottom: 5px; color: var(--primary); font-size: 15px;}
-        .contact-reminder { margin-top: 50px; text-align: center; background: rgba(197, 160, 33, 0.15); border: 1px solid var(--primary); color: #fff; padding: 25px; border-radius: 16px; font-weight: 700; letter-spacing: 1px; font-size: 15px;}
+        .footer-premium { page-break-before: always; break-before: page; padding: 50px 40px; background: #fff; }
+        .recommendations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 14px; color: #444; line-height: 1.6;}
+        .rec-item strong { display: block; margin-bottom: 5px; color: #71a5cb; font-size: 15px;}
+        
+        .contact-warning-box { 
+          margin: 50px auto; 
+          text-align: center; 
+          background: #fff; 
+          border: 2px solid #ef4444; 
+          color: #111; 
+          padding: 30px; 
+          border-radius: 16px; 
+          font-size: 16px; 
+          max-width: 90%; 
+          line-height: 1.5;
+        }
+
+        .final-black-footer { 
+          background: #111; 
+          color: #fff; 
+          padding: 40px; 
+          text-align: center; 
+          margin-top: 40px; 
+          border-radius: 12px;
+        }
+        .footer-coach-name { 
+          color: var(--primary); 
+          font-weight: 900; 
+          font-size: 18px; 
+          letter-spacing: 1px; 
+          margin-bottom: 20px; 
+          text-transform: uppercase;
+        }
+        .footer-contact-row { 
+          display: flex; 
+          justify-content: center; 
+          gap: 40px; 
+          font-weight: 700; 
+          font-size: 15px;
+        }
         
         @media (max-width: 768px) {
            .mv-grid { flex-direction: column; }
@@ -309,17 +379,23 @@ function App() {
 
         <div class="intro-box">
             <h2>¡Hola, ${athlete.name || 'Atleta'}!</h2>
-            <p><strong>Soy Juan Carlos González, TU Entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida. Juntos, superaremos cualquier obstáculo y celebraremos cada victoria, por pequeña que sea.</p>
+            <p><strong>Soy Juan Carlos González, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida. Juntos, superaremos cualquier obstáculo y celebraremos cada victoria, por pequeña que sea.</p>
         </div>
 
         <div class="mv-grid">
-            <div class="mv-box"><h4>MISIÓN</h4><p>Empoderar a las personas a través del ejercicio y el conocimiento, creando planes inteligentes que no solo construyan un cuerpo fuerte, sino también una mentalidad resiliente y segura.</p></div>
-            <div class="mv-box"><h4>VISIÓN</h4><p>Ser el catalizador del cambio, ayudando a alcanzar un bienestar físico y mental sostenible, convirtiendo la disciplina en un hábito.</p></div>
+            <div class="mv-box">
+                <h4>MISIÓN</h4>
+                <p>Empoderar a las personas a través del ejercicio y el conocimiento, creando planes inteligentes que no solo construyan un cuerpo fuerte, sino también una mentalidad resiliente y segura.</p>
+            </div>
+            <div class="mv-box">
+                <h4>VISIÓN</h4>
+                <p>Ser el catalizador del cambio, ayudando a alcanzar un bienestar físico y mental sostenible, convirtiendo la disciplina en un hábito.</p>
+            </div>
         </div>
 
         <div class="stats-bar">
             <div class="stat-item"><span class="stat-label">FECHA DE INICIO</span><span class="stat-val">${formatDate(athlete.startDate)}</span></div>
-            <div class="stat-item"><span class="stat-label">FECHA DE CONTROL</span><span class="stat-val" style="color:var(--primary)">${controlDateFormatted}</span></div>
+            <div class="stat-item"><span class="stat-label">FECHA DE CONTROL</span><span class="stat-val">${controlDateFormatted}</span></div>
             <div class="stat-item"><span class="stat-label">TIPO DE PLAN</span><span class="stat-val">${athlete.planType || 'Mensual'}</span></div>
             <div class="stat-item"><span class="stat-label">OBJETIVO PRINCIPAL</span><span class="stat-val">${athlete.goal}</span></div>
             <div class="stat-item"><span class="stat-label">PESO</span><span class="stat-val">${athlete.weight || '--'} KG</span></div>
@@ -328,7 +404,7 @@ function App() {
         ${routineHtml}
 
         <div class="footer-premium">
-            <h3>Protocolo de Reglas y Recomendaciones</h3>
+            <h3 style="color:#b91b1b; text-align:center; font-size:22px; font-weight:900; margin-bottom:40px;">PROTOCOLO DE REGLAS Y RECOMENDACIONES</h3>
             <div class="recommendations-grid">
                 <div class="rec-item"><strong>1. Calentamiento Activo</strong>Realiza 10 minutos de movilidad articular enfocada en los grupos musculares del día antes de comenzar.</div>
                 <div class="rec-item"><strong>2. Prioridad Técnica Absoluta</strong>La técnica siempre prevalece sobre el peso. Si no puedes mantener la forma estricta, reduce la carga.</div>
@@ -338,8 +414,22 @@ function App() {
                 <div class="rec-item"><strong>6. Enfriamiento (Cool-down)</strong>Al terminar la rutina, tómate 5 minutos para estirar estáticamente y estabilizar el ritmo cardíaco.</div>
             </div>
 
-            <div class="contact-reminder">
-                ⚠️ Ante cualquier molestia importante o duda técnica, detén el ejercicio y envíame un mensaje de inmediato, con gusto te ayudo a resolverlo. ⚠️
+            <div class="contact-warning-box">
+                ⚠️ <strong>Ante cualquier molestia importante o duda técnica, detén el ejercicio y envíame un mensaje de inmediato, con gusto te ayudo a resolverlo.</strong> ⚠️
+            </div>
+
+            <div class="final-black-footer">
+                <div class="footer-coach-name">JUAN CARLOS GONZALEZ</div>
+                <div class="footer-contact-row">
+                    <span>
+                        <svg style="width:18px; height:18px; vertical-align:middle; margin-right:8px;" viewBox="0 0 24 24"><path fill="white" d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
+                        3013806239
+                    </span>
+                    <span>
+                        <svg style="width:18px; height:18px; vertical-align:middle; margin-right:8px;" viewBox="0 0 24 24"><path fill="white" d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M18,4.48A1.23,1.23 0 1,0 19.22,5.7A1.23,1.23 0 0,0 18,4.48Z"/></svg>
+                        @juancarlosgc03_18
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -374,7 +464,13 @@ function App() {
   };
 
   return (
-    <div className="admin-container">
+    <>
+      <datalist id="exercises-list">
+        {allExercises.map(exName => (
+          <option key={exName} value={exName} />
+        ))}
+      </datalist>
+      <div className="admin-container">
       <div className="header">
         <h1>BODY BY <span>J.A.</span></h1>
         <p>CONTROL PANEL | JUAN CARLOS GONZÁLEZ</p>
@@ -470,20 +566,15 @@ function App() {
                       <div key={ex.id} className="exercise-sub-row">
                         <div className="field">
                           <label>{idx === 0 ? 'EJERCICIO' : 'EJERCICIO B'}</label>
-                          <select
+                          <input
+                            type="text"
+                            list="exercises-list"
                             className="sel-name"
+                            placeholder="Buscar ejercicio..."
                             value={ex.name}
                             onChange={(e) => updateExercise(day.name, group.id, ex.id, 'name', e.target.value)}
-                          >
-                            <option value="">- Seleccionar -</option>
-                            {Object.entries(EXERCISES_DB).map(([cat, exercises]) => (
-                              <optgroup key={cat} label={cat}>
-                                {exercises.map(exName => (
-                                  <option key={exName} value={exName}>{exName}</option>
-                                ))}
-                              </optgroup>
-                            ))}
-                          </select>
+                            onFocus={(e) => e.target.select()}
+                          />
                         </div>
 
                         <div className="field">
@@ -564,6 +655,7 @@ function App() {
         GENERAR PLAN PARA EL CLIENTE
       </button>
     </div>
+    </>
   );
 }
 
