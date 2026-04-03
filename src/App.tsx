@@ -54,7 +54,10 @@ function App() {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [routineDays, setRoutineDays] = useState<RoutineDay[]>([]);
 
-  const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+  // Consolidate all exercises for the search datalist (MEJORA INTEGRADA)
+  const allExercises = Object.values(EXERCISES_DB).flat().sort();
 
   const handleDayToggle = (day: string) => {
     setSelectedDays(prev =>
@@ -63,11 +66,11 @@ function App() {
   };
 
   const renderDays = () => {
-    // Check which days were added/removed
     const newRoutineDays = selectedDays.map(dayName => {
       const existing = routineDays.find(d => d.name === dayName);
       return existing || { name: dayName, groups: [] };
     });
+    newRoutineDays.sort((a, b) => daysOfWeek.indexOf(a.name) - daysOfWeek.indexOf(b.name));
     setRoutineDays(newRoutineDays);
   };
 
@@ -137,7 +140,6 @@ function App() {
                 if (ex.id !== exId) return ex;
 
                 const updated = { ...ex, [field]: value };
-                // Handle complex updates
                 if (field === 'name') {
                   const valStr = value as string;
                   updated.img = getImageUrl(valStr);
@@ -145,7 +147,7 @@ function App() {
                   if (updated.isCardio) {
                     updated.reps = "MIN";
                   } else if (ex.isCardio) {
-                    updated.reps = ""; // clear if it was cardio before
+                    updated.reps = "";
                   }
                 }
                 return updated;
@@ -158,7 +160,6 @@ function App() {
   };
 
   const generateClientPortal = async () => {
-    // Función para convertir la URL de la imagen a Base64
     const imageToBase64 = async (url: string): Promise<string> => {
       if (!url) return '';
       try {
@@ -291,7 +292,7 @@ function App() {
         .recommendations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 16px; color: #444; line-height: 1.6;}
         .rec-item strong { display: block; margin-bottom: 5px; color: #71a5cb; font-size: 17px;}
         .contact-reminder { margin-top: 50px; text-align: center; background: rgba(248, 74, 74, 0.05); border: 2px solid #f84a4a; color: #111; padding: 25px; border-radius: 16px; font-weight: 700; letter-spacing: 1px; font-size: 17px;}
-        
+
         .footer-black { background: #111; color: #fff; padding: 50px 40px; position: relative; border-top: 2px solid #333;}
         .coach-contact-section { text-align: center; }
         .coach-contact-section h4 { color: var(--primary); text-transform: uppercase; margin-bottom: 15px; font-size: 18px; font-weight: 900;}
@@ -310,59 +311,63 @@ function App() {
     </style>
 </head>
 <body>
-    <div class="wrapper">
-        <div class="top-banner">
-            <h1 class="brand-logo">BODY BY <span style="color:#c5a021">J.A.</span></h1>
-            <p class="brand-subtitle">Juan Carlos Gonzalez</p>
-            <p class="brand-subtitle">Plan de Entrenamiento Personalizado</p>
+    <div class=\"wrapper\">
+        <div class=\"top-banner\">
+            <h1 class=\"brand-logo\">BODY BY <span style=\"color:#c5a021\">J.A.</span></h1>
+            <p class=\"brand-subtitle\">Juan Carlos Gonzalez</p>
+            <p class=\"brand-subtitle\">Plan de Entrenamiento Personalizado</p>
         </div>
 
-        <div class="intro-box">
+        <div class=\"intro-box\">
             <h2>¡Hola, ${athlete.name || 'Atleta'}!</h2>
             <p><strong>Soy Juan Carlos González, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida. Juntos, superaremos cualquier obstáculo y celebraremos cada victoria, por pequeña que sea.</p>
         </div>
 
-        <div class="mv-grid">
-            <div class="mv-box"><h4>MISIÓN</h4><p>Empoderar a las personas a través del ejercicio y el conocimiento, creando planes inteligentes que no solo construyan un cuerpo fuerte, sino también una mentalidad resiliente y segura.</p></div>
-            <div class="mv-box"><h4>VISIÓN</h4><p>Ser el catalizador del cambio, ayudando a alcanzar un bienestar físico y mental sostenible, convirtiendo la disciplina en un hábito.</p></div>
+        <div class=\"mv-grid\">
+            <div class=\"mv-box\"><h4>MISIÓN</h4><p>Empoderar a las personas a través del ejercicio y el conocimiento, creando planes inteligentes que no solo construyan un cuerpo fuerte, sino también una mentalidad resiliente y segura.</p></div>
+            <div class=\"mv-box\"><h4>VISIÓN</h4><p>Ser el catalizador del cambio, ayudando a alcanzar un bienestar físico y mental sostenible, convirtiendo la disciplina en un hábito.</p></div>
         </div>
 
-        <div class="stats-bar">
-            <div class="stat-item"><span class="stat-label">FECHA DE INICIO</span><span class="stat-val">${formatDate(athlete.startDate)}</span></div>
-            <div class="stat-item"><span class="stat-label">FECHA DE CONTROL</span><span class="stat-val">${controlDateFormatted}</span></div>
-            <div class="stat-item"><span class="stat-label">TIPO DE PLAN</span><span class="stat-val">${athlete.planType || 'Mensual'}</span></div>
-            <div class="stat-item"><span class="stat-label">OBJETIVO PRINCIPAL</span><span class="stat-val">${athlete.goal}</span></div>
-            <div class="stat-item"><span class="stat-label">PESO</span><span class="stat-val">${athlete.weight || '--'} KG</span></div>
+
+        <div class=\"stats-bar\">
+            <div class=\"stat-item\"><span class=\"stat-label\">FECHA DE INICIO</span><span class=\"stat-val\">${formatDate(athlete.startDate)}</span></div>
+            <div class=\"stat-item\"><span class=\"stat-label\">FECHA DE CONTROL</span><span class=\"stat-val\">${controlDateFormatted}</span></div>
+            <div class=\"stat-item\"><span class=\"stat-label\">TIPO DE PLAN</span><span class=\"stat-val\">${athlete.planType || 'Mensual'}</span></div>
+            <div class=\"stat-item\"><span class=\"stat-label\">OBJETIVO PRINCIPAL</span><span class=\"stat-val\">${athlete.goal}</span></div>
+            <div class=\"stat-item\"><span class=\"stat-label\">PESO</span><span class=\"stat-val\">${athlete.weight || '--'} KG</span></div>
+
         </div>
 
         ${routineHtml}
 
-        <div class="recommendations-section">
+        <div class=\"recommendations-section\">
+
             <h3>Protocolo de Reglas y Recomendaciones</h3>
-            <div class="recommendations-grid">
-                <div class="rec-item"><strong>1. Calentamiento Activo</strong>Realiza 10 minutos de movilidad articular enfocada en los grupos musculares del día antes de comenzar.</div>
-                <div class="rec-item"><strong>2. Prioridad Técnica Absoluta</strong>La técnica siempre prevalece sobre el peso. Si no puedes mantener la forma estricta, reduce la carga.</div>
-                <div class="rec-item"><strong>3. Sobrecarga Progresiva</strong>Inicia con cargas que domines y apúntalas. Progresa subiendo peso o repeticiones solo cuando la técnica sea perfecta.</div>
-                <div class="rec-item"><strong>4. Hidratación Estratégica</strong>Mantente hidratado bebiendo cada 15-20 minutos durante la sesión.</div>
-                <div class="rec-item"><strong>5. Recuperación Indispensable</strong>Respeta los descansos pautados en la rutina. El trabajo muscular real se procesa mientras descansas.</div>
-                <div class="rec-item"><strong>6. Enfriamiento (Cool-down)</strong>Al terminar la rutina, tómate 5 minutos para estirar estáticamente y estabilizar el ritmo cardíaco.</div>
+            <div class=\"recommendations-grid\">
+                <div class=\"rec-item\"><strong>1. Calentamiento Activo</strong>Realiza 10 minutos de movilidad articular enfocada en los grupos musculares del día antes de comenzar.</div>
+                <div class=\"rec-item\"><strong>2. Prioridad Técnica Absoluta</strong>La técnica siempre prevalece sobre el peso. Si no puedes mantener la forma estricta, reduce la carga.</div>
+                <div class=\"rec-item\"><strong>3. Sobrecarga Progresiva</strong>Inicia con cargas que domines y apúntalas. Progresa subiendo peso o repeticiones solo cuando la técnica sea perfecta.</div>
+                <div class=\"rec-item\"><strong>4. Hidratación Estratégica</strong>Mantente hidratado bebiendo cada 15-20 minutos durante la sesión.</div>
+                <div class=\"rec-item\"><strong>5. Recuperación Indispensable</strong>Respeta los descansos pautados en la rutina. El trabajo muscular real se procesa mientras descansas.</div>
+                <div class=\"rec-item\"><strong>6. Enfriamiento (Cool-down)</strong>Al terminar la rutina, tómate 5 minutos para estirar estáticamente y estabilizar el ritmo cardíaco.</div>
             </div>
 
-            <div class="contact-reminder">
+            <div class=\"contact-reminder\">
                 ⚠️ Ante cualquier molestia importante o duda técnica, detén el ejercicio y envíame un mensaje de inmediato, con gusto te ayudo a resolverlo. ⚠️
             </div>
         </div>
 
-        <div class="footer-black">
-            <div class="coach-contact-section">
+        <div class=\"footer-black\">
+            <div class=\"coach-contact-section\">
                 <h4>Juan Carlos Gonzalez</h4>
-                <div class="contact-details">
-                    <div class="contact-link">
-                        <svg viewBox="0 0 24 24" width="20" fill="currentColor"><path d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
+                <div class=\"contact-details\">
+                    <div class=\"contact-link\">
+                        <svg viewBox=\"0 0 24 24\" width=\"20\" fill=\"currentColor\"><path d=\"M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z\"/></svg>
                         3013806239
                     </div>
-                    <div class="contact-link">
-                        <svg viewBox="0 0 24 24" width="20" fill="currentColor"><path d="M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M18,4.5A1.5,1.5 0 1,0 19.5,6A1.5,1.5 0 0,0 18,4.5Z"/></svg>
+                    <div class=\"contact-link\">
+                        <svg viewBox=\"0 0 24 24\" width=\"20\" fill=\"currentColor\"><path d=\"M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M18,4.5A1.5,1.5 0 1,0 19.5,6A1.5,1.5 0 0,0 18,4.5Z\"/></svg>
+
                         @juancarlosgc03_18
                     </div>
                 </div>
@@ -471,196 +476,198 @@ function App() {
   };
 
   return (
-    <div className="admin-container">
-      <div className="header">
-        <h1>BODY BY <span>J.A.</span></h1>
-        <p>CONTROL PANEL | JUAN CARLOS GONZÁLEZ</p>
-      </div>
-
-      <div className="section-title">Datos del Atleta</div>
-      <div className="grid-inputs">
-        <div className="field">
-          <label>Nombre del Cliente</label>
-          <input type="text" value={athlete.name} onChange={e => setAthlete({ ...athlete, name: e.target.value })} />
-        </div>
-        <div className="field">
-          <label>ID</label>
-          <input type="number" value={athlete.id} onChange={e => setAthlete({ ...athlete, id: e.target.value })} />
-        </div>
-        <div className="field">
-          <label>Edad</label>
-          <input type="number" value={athlete.age} onChange={e => setAthlete({ ...athlete, age: e.target.value })} />
-        </div>
-        <div className="field">
-          <label>Peso (kg)</label>
-          <input type="number" value={athlete.weight} onChange={e => setAthlete({ ...athlete, weight: e.target.value })} />
-        </div>
-        <div className="field">
-          <label>Objetivo</label>
-          <select value={athlete.goal} onChange={e => setAthlete({ ...athlete, goal: e.target.value })}>
-            <option>Definición Muscular</option>
-            <option>Volumen Muscular</option>
-            <option>Mantenimiento Físico</option>
-            <option>Recomposicion Corporal</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Tipo de Plan</label>
-          <select value={athlete.planType} onChange={e => setAthlete({ ...athlete, planType: e.target.value })}>
-            <option value="Mensual">Mensual</option>
-            <option value="Dos meses">Dos meses</option>
-            <option value="Trimestral">Trimestral</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Fecha de Inicio</label>
-          <input
-            type="date"
-            value={athlete.startDate}
-            onChange={e => {
-              const newStart = e.target.value;
-              const d = new Date(newStart + 'T12:00:00');
-              d.setMonth(d.getMonth() + 1);
-              const newControl = d.toISOString().split('T')[0];
-              setAthlete({ ...athlete, startDate: newStart, controlDate: newControl });
-            }}
-          />
-        </div>
-        <div className="field">
-          <label>Fecha de Control (Auto)</label>
-          <input type="date" value={athlete.controlDate} readOnly style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }} />
-        </div>
-      </div>
-
-      <div className="section-title">Configurar Rutina</div>
-      <div className="days-selector">
-        {daysOfWeek.map(day => (
-          <label key={day}>
-            <input
-              type="checkbox"
-              checked={selectedDays.includes(day)}
-              onChange={() => handleDayToggle(day)}
-            />
-            {day}
-          </label>
+    <>
+      <datalist id=\"exercises-list\">
+        {allExercises.map(exName => (
+          <option key={exName} value={exName} />
         ))}
-        <button className="btn btn-add-day main-add-btn" onClick={renderDays}>
-          Crear Días
-        </button>
-      </div>
+      </datalist>
+      <div className=\"admin-container\">
+        <div className=\"header\">
+          <h1>BODY BY <span>J.A.</span></h1>
+          <p>CONTROL PANEL | JUAN CARLOS GONZÁLEZ</p>
+        </div>
 
-      <div id="routine-builder">
-        {routineDays.map(day => (
-          <div key={day.name} className="day-container">
-            <div className="day-header">
-              {day.name}
-              <button className="btn btn-add-day" onClick={() => addGroup(day.name)}>+ Bloque</button>
-            </div>
+        <div className=\"section-title\">Datos del Atleta</div>
+        <div className=\"grid-inputs\">
+          <div className=\"field\">
+            <label>Nombre del Cliente</label>
+            <input type=\"text\" value={athlete.name} onChange={e => setAthlete({ ...athlete, name: e.target.value })} />
+          </div>
+          <div className=\"field\">
+            <label>ID</label>
+            <input type=\"number\" value={athlete.id} onChange={e => setAthlete({ ...athlete, id: e.target.value })} />
+          </div>
+          <div className=\"field\">
+            <label>Edad</label>
+            <input type=\"number\" value={athlete.age} onChange={e => setAthlete({ ...athlete, age: e.target.value })} />
+          </div>
+          <div className=\"field\">
+            <label>Peso (kg)</label>
+            <input type=\"number\" value={athlete.weight} onChange={e => setAthlete({ ...athlete, weight: e.target.value })} />
+          </div>
+          <div className=\"field\">
+            <label>Objetivo</label>
+            <select value={athlete.goal} onChange={e => setAthlete({ ...athlete, goal: e.target.value })}>
+              <option>Definición Muscular</option>
+              <option>Volumen Muscular</option>
+              <option>Mantenimiento Físico</option>
+              <option>Recomposicion Corporal</option>
+            </select>
+          </div>
+          <div className=\"field\">
+            <label>Tipo de Plan</label>
+            <select value={athlete.planType} onChange={e => setAthlete({ ...athlete, planType: e.target.value })}>
+              <option value=\"Mensual\">Mensual</option>
+              <option value=\"Dos meses\">Dos meses</option>
+              <option value=\"Trimestral\">Trimestral</option>
+            </select>
+          </div>
+          <div className=\"field\">
+            <label>Fecha de Inicio</label>
+            <input
+              type=\"date\"
+              value={athlete.startDate}
+              onChange={e => {
+                const newStart = e.target.value;
+                const d = new Date(newStart + 'T12:00:00');
+                d.setMonth(d.getMonth() + 1);
+                const newControl = d.toISOString().split('T')[0];
+                setAthlete({ ...athlete, startDate: newStart, controlDate: newControl });
+              }}
+            />
+          </div>
+          <div className=\"field\">
+            <label>Fecha de Control (Auto)</label>
+            <input type=\"date\" value={athlete.controlDate} readOnly style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }} />
+          </div>
+        </div>
 
-            <div className="day-groups">
-              {day.groups.map(group => (
-                <div key={group.id} className="exercise-group">
-                  <button className="btn btn-del" onClick={() => removeGroup(day.name, group.id)}>Eliminar</button>
+        <div className=\"section-title\">Configurar Rutina</div>
+        <div className=\"days-selector\">
+          {daysOfWeek.map(day => (
+            <label key={day}>
+              <input
+                type=\"checkbox\"
+                checked={selectedDays.includes(day)}
+                onChange={() => handleDayToggle(day)}
+              />
+              {day}
+            </label>
+          ))}
+          <button className=\"btn btn-add-day main-add-btn\" onClick={renderDays}>
+            Crear Días
+          </button>
+        </div>
 
-                  <div className="rows-holder">
-                    {group.exercises.map((ex, idx) => (
-                      <div key={ex.id} className="exercise-sub-row">
-                        <div className="field">
-                          <label>{idx === 0 ? 'EJERCICIO' : 'EJERCICIO B'}</label>
-                          <select
-                            className="sel-name"
-                            value={ex.name}
-                            onChange={(e) => updateExercise(day.name, group.id, ex.id, 'name', e.target.value)}
-                          >
-                            <option value="">- Seleccionar -</option>
-                            {Object.entries(EXERCISES_DB).map(([cat, exercises]) => (
-                              <optgroup key={cat} label={cat}>
-                                {exercises.map(exName => (
-                                  <option key={exName} value={exName}>{exName}</option>
-                                ))}
-                              </optgroup>
-                            ))}
-                          </select>
-                        </div>
+        <div id=\"routine-builder\">
+          {routineDays.map(day => (
+            <div key={day.name} className=\"day-container\">
+              <div className=\"day-header\">
+                {day.name}
+                <button className=\"btn btn-add-day\" onClick={() => addGroup(day.name)}>+ Bloque</button>
+              </div>
 
-                        <div className="field">
-                          <label>MÉTRICA</label>
-                          <div className="metric-split">
-                            {ex.isCardio ? (
-                              <div className="metric-field">
-                                <label>TIEMPO (MIN)</label>
-                                <input
-                                  type="text"
-                                  placeholder="00"
-                                  value={ex.series}
-                                  onChange={(e) => updateExercise(day.name, group.id, ex.id, 'series', e.target.value)}
-                                  style={{ width: 100 }}
-                                />
-                              </div>
-                            ) : (
-                              <>
-                                <div className="metric-field">
-                                  <label>SERIES</label>
+              <div className=\"day-groups\">
+                {day.groups.map(group => (
+                  <div key={group.id} className=\"exercise-group\">
+                    <button className=\"btn btn-del\" onClick={() => removeGroup(day.name, group.id)}>Eliminar</button>
+
+                    <div className=\"rows-holder\">
+                      {group.exercises.map((ex, idx) => (
+                        <div key={ex.id} className=\"exercise-sub-row\">
+                          <div className=\"field\">
+                            <label>{idx === 0 ? 'EJERCICIO' : 'EJERCICIO B'}</label>
+                            <input
+                              type=\"text\"
+                              list=\"exercises-list\"
+                              className=\"sel-name\"
+                              placeholder=\"Buscar ejercicio...\"
+                              value={ex.name}
+                              onChange={(e) => updateExercise(day.name, group.id, ex.id, 'name', e.target.value)}
+                              onFocus={(e) => e.target.select()}
+                            />
+                          </div>
+
+                          <div className=\"field\">
+                            <label>MÉTRICA</label>
+                            <div className=\"metric-split\">
+                              {ex.isCardio ? (
+                                <div className=\"metric-field\">
+                                  <label>TIEMPO (MIN)</label>
                                   <input
-                                    type="text"
-                                    placeholder="S"
+                                    type=\"text\"
+                                    placeholder=\"00\"
                                     value={ex.series}
                                     onChange={(e) => updateExercise(day.name, group.id, ex.id, 'series', e.target.value)}
+                                    style={{ width: 100 }}
                                   />
                                 </div>
-                                <div className="metric-field">
-                                  <label>REPS</label>
-                                  <input
-                                    type="text"
-                                    placeholder="R"
-                                    value={ex.reps}
-                                    onChange={(e) => updateExercise(day.name, group.id, ex.id, 'reps', e.target.value)}
-                                  />
-                                </div>
-                              </>
+                              ) : (
+                                <>
+                                  <div className=\"metric-field\">
+                                    <label>SERIES</label>
+                                    <input
+                                      type=\"text\"
+                                      placeholder=\"S\"
+                                      value={ex.series}
+                                      onChange={(e) => updateExercise(day.name, group.id, ex.id, 'series', e.target.value)}
+                                    />
+                                  </div>
+                                  <div className=\"metric-field\">
+                                    <label>REPS</label>
+                                    <input
+                                      type=\"text\"
+                                      placeholder=\"R\"
+                                      value={ex.reps}
+                                      onChange={(e) => updateExercise(day.name, group.id, ex.id, 'reps', e.target.value)}
+                                    />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className=\"field field-notes\">
+                            <label>NOTAS DEL COACH</label>
+                            <textarea
+                              rows={3}
+                              value={ex.note}
+                              onChange={(e) => updateExercise(day.name, group.id, ex.id, 'note', e.target.value)}
+                            />
+                          </div>
+
+                          <div className=\"img-preview-box\">
+                            {ex.img ? (
+                              <img src={ex.img} alt={ex.name} />
+                            ) : (
+                              <span>+ FOTO (Auto)</span>
                             )}
                           </div>
                         </div>
+                      ))}
+                    </div>
 
-                        <div className="field field-notes">
-                          <label>NOTAS DEL COACH</label>
-                          <textarea
-                            rows={3}
-                            value={ex.note}
-                            onChange={(e) => updateExercise(day.name, group.id, ex.id, 'note', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="img-preview-box">
-                          {ex.img ? (
-                            <img src={ex.img} alt={ex.name} />
-                          ) : (
-                            <span>+ FOTO (Auto)</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                    {group.exercises.length < 2 && (
+                      <button className=\"btn btn-biserie\" onClick={() => addBiserie(day.name, group.id)}>
+                        + AGREGAR BISERIE
+                      </button>
+                    )}
+                    <div className=\"rest-time-label\">
+                      ⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE
+                    </div>
                   </div>
-
-                  {group.exercises.length < 2 && (
-                    <button className="btn btn-biserie" onClick={() => addBiserie(day.name, group.id)}>
-                      + AGREGAR BISERIE
-                    </button>
-                  )}
-                  <div className="rest-time-label">
-                    ⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <button className="btn btn-generate" onClick={generateClientPortal}>
-        GENERAR PLAN PARA EL CLIENTE
-      </button>
-    </div>
+        <button className=\"btn btn-generate\" onClick={generateClientPortal}>
+          GENERAR PLAN PARA EL CLIENTE
+        </button>
+      </div>
+    </>
   );
 }
 
