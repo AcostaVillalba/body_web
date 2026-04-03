@@ -101,7 +101,7 @@ class ClientData(BaseModel):
     id: str = ""
     goal: str = ""
     weight: str = ""
-    planType: str = "Mensual"
+    planType: str = ""
     startDate: str = ""
     controlDate: str = ""
 
