@@ -292,7 +292,7 @@ function App() {
         .recommendations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 16px; color: #444; line-height: 1.6;}
         .rec-item strong { display: block; margin-bottom: 5px; color: #71a5cb; font-size: 17px;}
         .contact-reminder { margin-top: 50px; text-align: center; background: rgba(248, 74, 74, 0.05); border: 2px solid #f84a4a; color: #111; padding: 25px; border-radius: 16px; font-weight: 700; letter-spacing: 1px; font-size: 17px;}
-        
+
         .footer-black { background: #111; color: #fff; padding: 50px 40px; position: relative; border-top: 2px solid #333;}
         .coach-contact-section { text-align: center; }
         .coach-contact-section h4 { color: var(--primary); text-transform: uppercase; margin-bottom: 15px; font-size: 18px; font-weight: 900;}
@@ -328,17 +328,20 @@ function App() {
             <div class=\"mv-box\"><h4>VISIÓN</h4><p>Ser el catalizador del cambio, ayudando a alcanzar un bienestar físico y mental sostenible, convirtiendo la disciplina en un hábito.</p></div>
         </div>
 
+
         <div class=\"stats-bar\">
             <div class=\"stat-item\"><span class=\"stat-label\">FECHA DE INICIO</span><span class=\"stat-val\">${formatDate(athlete.startDate)}</span></div>
             <div class=\"stat-item\"><span class=\"stat-label\">FECHA DE CONTROL</span><span class=\"stat-val\">${controlDateFormatted}</span></div>
             <div class=\"stat-item\"><span class=\"stat-label\">TIPO DE PLAN</span><span class=\"stat-val\">${athlete.planType || 'Mensual'}</span></div>
             <div class=\"stat-item\"><span class=\"stat-label\">OBJETIVO PRINCIPAL</span><span class=\"stat-val\">${athlete.goal}</span></div>
             <div class=\"stat-item\"><span class=\"stat-label\">PESO</span><span class=\"stat-val\">${athlete.weight || '--'} KG</span></div>
+
         </div>
 
         ${routineHtml}
 
         <div class=\"recommendations-section\">
+
             <h3>Protocolo de Reglas y Recomendaciones</h3>
             <div class=\"recommendations-grid\">
                 <div class=\"rec-item\"><strong>1. Calentamiento Activo</strong>Realiza 10 minutos de movilidad articular enfocada en los grupos musculares del día antes de comenzar.</div>
@@ -364,6 +367,7 @@ function App() {
                     </div>
                     <div class=\"contact-link\">
                         <svg viewBox=\"0 0 24 24\" width=\"20\" fill=\"currentColor\"><path d=\"M7.8,2H16.2C19.4,2 22,4.6 22,7.8V16.2A5.8,5.8 0 0,1 16.2,22H7.8C4.6,22 2,19.4 2,16.2V7.8A5.8,5.8 0 0,1 7.8,2M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M18,4.5A1.5,1.5 0 1,0 19.5,6A1.5,1.5 0 0,0 18,4.5Z\"/></svg>
+
                         @juancarlosgc03_18
                     </div>
                 </div>
