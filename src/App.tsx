@@ -194,63 +194,89 @@ function App() {
       return dayMap[dayName] || dayName.substring(0, 3).toUpperCase();
     };
 
+    const MAX_PAGE_HEIGHT = 780; // Altura máxima aproximada de contenido por página (formato Letter)
+    const DAY_HEADER_H = 60;     // Altura estimada del encabezado dorado
+    const EX_CARD_H_BASE = 40;   // Altura base del card (bordes, spacing)
+    const EX_ROW_H = 240;        // Altura estimada de cada ejercicio (nombre + imagen + nota)
+    const REST_BAR_H = 50;       // Altura de la barra de descanso
+
     let routineHtml = '';
 
     for (const day of routineDays) {
       const dayAbbr = getDayAbbr(day.name);
-      let dayExIdx = 0;
-
-      routineHtml += `
-        <table class="day-table-master" style="width:100%; border-collapse:collapse; page-break-before:always; break-before:page;">
-          <thead>
-            <tr>
-              <td style="padding:0; border:none;">
-                <div class="client-day-header">
-                  <span>${day.name}</span>
-                  <span class="day-contact">
-                    <svg viewBox="0 0 24 24" width="16" style="vertical-align:middle; margin-right:5px;"><path fill="white" d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
-                    @juancarlosgc03_18 | 3013806239
-                  </span>
-                </div>
-              </td>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding:0; border:none;">
-                <div class="day-groups-container">`;
+      
+      // 1. Dividir los grupos de ejercicios del día en páginas
+      const dayPages: RoutineGroup[][] = [];
+      let currentPage: RoutineGroup[] = [];
+      let currentHeight = 0;
 
       for (const group of day.groups) {
-        dayExIdx++;
-        const isBis = group.exercises.length > 1;
-        routineHtml += `
-          <div class="client-ex-card ${isBis ? 'biserie-card' : ''}">
-            <div class="card-header-bar">
-                <div class="ex-number-tag">${dayAbbr} | EJERCICIO #${dayExIdx}</div>
-                ${isBis ? `<div class="biserie-tag">BISERIE (A + B) / EN SUPER SERIE</div>` : ''}
-            </div>`;
+        // Calcular altura estimada del grupo (bloque de ejercicio o biserie)
+        const groupHeight = EX_CARD_H_BASE + (group.exercises.length * EX_ROW_H) + REST_BAR_H;
 
-        for (let idx = 0; idx < group.exercises.length; idx++) {
-          const ex = group.exercises[idx];
-          const base64Img = await imageToBase64(ex.img);
-
-          const metricText = ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series || '0'} Series x ${ex.reps || '0'} Reps`;
-          routineHtml += `
-                    <div class="client-row">
-                        <div class="client-info">
-                            <div class="client-ex-name">${isBis ? (idx === 0 ? 'A. ' : 'B. ') : ''}${ex.name || 'Ejercicio'}</div>
-                            <div class="client-metric">${metricText}</div>
-                            ${ex.note ? `<div class="client-note">${ex.note}</div>` : ''}
-                        </div>
-                        ${base64Img ? `
-                        <div class="client-img-large">
-                            <img src="${base64Img}">
-                        </div>` : ''}
-                    </div>`;
+        if (currentHeight + groupHeight > MAX_PAGE_HEIGHT && currentPage.length > 0) {
+          dayPages.push(currentPage);
+          currentPage = [];
+          currentHeight = 0;
         }
-        routineHtml += `<div class="client-rest-bar">⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE</div></div>`;
+        
+        if (currentPage.length === 0) {
+          currentHeight += DAY_HEADER_H; // El encabezado solo cuenta al inicio de la página
+        }
+
+        currentPage.push(group);
+        currentHeight += groupHeight;
       }
-      routineHtml += `</div></td></tr></tbody></table>`;
+      if (currentPage.length > 0) dayPages.push(currentPage);
+
+      // 2. Generar el HTML para cada página del día
+      let dayExIdx = 0;
+      for (let pIdx = 0; pIdx < dayPages.length; pIdx++) {
+        const pageGroups = dayPages[pIdx];
+        
+        routineHtml += `
+          <div class="day-page-container" style="page-break-before:always; break-before:page;">
+            <div class="client-day-header">
+              <span>${day.name} ${dayPages.length > 1 ? `(Pág. ${pIdx + 1})` : ''}</span>
+              <span class="day-contact">
+                <svg viewBox="0 0 24 24" width="16" style="vertical-align:middle; margin-right:5px;"><path fill="white" d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"/></svg>
+                @juancarlosgc03_18 | 3013806239
+              </span>
+            </div>
+            <div class="day-groups-container">`;
+
+        for (const group of pageGroups) {
+          dayExIdx++;
+          const isBis = group.exercises.length > 1;
+          routineHtml += `
+            <div class="client-ex-card ${isBis ? 'biserie-card' : ''}">
+              <div class="card-header-bar">
+                  <div class="ex-number-tag">${dayAbbr} | EJERCICIO #${dayExIdx}</div>
+                  ${isBis ? `<div class="biserie-tag">BISERIE (A + B) / EN SUPER SERIE</div>` : ''}
+              </div>`;
+
+          for (let idx = 0; idx < group.exercises.length; idx++) {
+            const ex = group.exercises[idx];
+            const base64Img = await imageToBase64(ex.img);
+            const metricText = ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series || '0'} Series x ${ex.reps || '0'} Reps`;
+            
+            routineHtml += `
+                      <div class="client-row">
+                          <div class="client-info">
+                              <div class="client-ex-name">${isBis ? (idx === 0 ? 'A. ' : 'B. ') : ''}${ex.name || 'Ejercicio'}</div>
+                              <div class="client-metric">${metricText}</div>
+                              ${ex.note ? `<div class="client-note">${ex.note}</div>` : ''}
+                          </div>
+                          ${base64Img ? `
+                          <div class="client-img-large">
+                              <img src="${base64Img}">
+                          </div>` : ''}
+                      </div>`;
+          }
+          routineHtml += `<div class="client-rest-bar">⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE</div></div>`;
+        }
+        routineHtml += `</div></div>`;
+      }
     }
 
     const finalTemplate = `
@@ -292,8 +318,8 @@ function App() {
         .stat-label { font-size: 12px; color: var(--primary); font-weight: 800; letter-spacing: 1px;}
         .stat-val { font-size: 18px; font-weight: 400; color: #333;}
 
-        .day-table-master thead { display: table-header-group; }
-        .client-day-header { background: var(--primary); color: #fff; padding: 10px 40px; font-size: 18px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; text-transform: uppercase;}
+        .day-page-container { width: 100%; border-bottom: none; overflow: hidden; }
+        .client-day-header { background: var(--primary); color: #fff; padding: 15px 40px; font-size: 18px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0; text-transform: uppercase;}
         .day-contact { font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; letter-spacing: 1px;}
         
         .day-groups-container { padding: 30px 40px; background: #fff;}
