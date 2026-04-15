@@ -1,11 +1,20 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import json
-from datetime import datetime
+from typing import List, Optional
+from datetime import datetime, timedelta
 import os
 from google.cloud import bigquery
 from google.oauth2 import service_account
+from sqlalchemy.orm import Session
+
+# Database and Auth imports
+from database import engine, get_db
+import models
+import auth
+
+# Create DB Tables
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="BodyByJA Internal Server")
 
@@ -18,130 +27,254 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuración de BigQuery
+# Configuración de BigQuery (Mantenida como respaldo analítico)
 PROJECT_ID = "body-web-491923"
 DATASET_ID = "bodybyja_analytics"
 TABLE_ID = "client_plans"
 CREDENTIALS_PATH = os.path.join(os.path.dirname(__file__), "secrets", "credentials.json")
 
-# Inicializar cliente de BigQuery
 def get_bigquery_client():
     if os.path.exists(CREDENTIALS_PATH):
         credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_PATH)
         return bigquery.Client(credentials=credentials, project=PROJECT_ID)
     return None
 
-def setup_bigquery():
-    client = get_bigquery_client()
-    if not client:
-        print("Aviso: No se encontraron credenciales en backend/secrets/credentials.json. BigQuery desactivado.")
-        return
-
-    dataset_ref = bigquery.DatasetReference(PROJECT_ID, DATASET_ID)
-    try:
-        client.get_dataset(dataset_ref)
-    except Exception:
-        dataset = bigquery.Dataset(dataset_ref)
-        dataset.location = "US"
-        client.create_dataset(dataset)
-        print(f"Dataset {DATASET_ID} creado.")
-
-    table_ref = dataset_ref.table(TABLE_ID)
-    try:
-        client.get_table(table_ref)
-    except Exception:
-        schema = [
-            bigquery.SchemaField("name", "STRING"),
-            bigquery.SchemaField("id", "STRING"),
-            bigquery.SchemaField("goal", "STRING"),
-            bigquery.SchemaField("weight", "STRING"),
-            bigquery.SchemaField("planType", "STRING"),
-            bigquery.SchemaField("startDate", "STRING"),
-            bigquery.SchemaField("controlDate", "STRING"),
-            bigquery.SchemaField("timestamp", "TIMESTAMP"),
-        ]
-        table = bigquery.Table(table_ref, schema=schema)
-        client.create_table(table)
-        print(f"Tabla {TABLE_ID} creada.")
-    
-    # Verificar si falta la columna planType en la tabla existente
-    table = client.get_table(table_ref)
-    existing_columns = [field.name for field in table.schema]
-    if "planType" not in existing_columns:
-        print("Actualizando esquema de la tabla para incluir 'planType'...")
-        new_schema = list(table.schema)
-        new_schema.append(bigquery.SchemaField("planType", "STRING"))
-        table.schema = new_schema
-        client.update_table(table, ["schema"])
-        print("Esquema actualizado con éxito para planType.")
-
-    if "startDate" not in existing_columns:
-        print("Actualizando esquema de la tabla para incluir 'startDate'...")
-        new_schema = list(table.schema)
-        new_schema.append(bigquery.SchemaField("startDate", "STRING"))
-        table.schema = new_schema
-        client.update_table(table, ["schema"])
-        print("Esquema actualizado con éxito para startDate.")
-
-    if "controlDate" not in existing_columns:
-        print("Actualizando esquema de la tabla para incluir 'controlDate'...")
-        new_schema = list(table.schema)
-        new_schema.append(bigquery.SchemaField("controlDate", "STRING"))
-        table.schema = new_schema
-        client.update_table(table, ["schema"])
-        print("Esquema actualizado con éxito para controlDate.")
-
-# Ejecutar setup al iniciar
-@app.on_event("startup")
-async def startup_event():
-    setup_bigquery()
-
-class ClientData(BaseModel):
-    name: str = ""
-    id: str = ""
-    goal: str = ""
-    weight: str = ""
-    planType: str = "Mensual"
-    startDate: str = ""
-    controlDate: str = ""
-
-FILE_PATH = "clients_data.jsonl"
-
-def write_to_file(data: dict):
-    try:
-        with open(FILE_PATH, "a", encoding="utf-8") as f:
-            data["timestamp"] = datetime.now().isoformat()
-            f.write(json.dumps(data, ensure_ascii=False) + "\n")
-    except Exception as e:
-        print(f"Error escribiendo localmente: {e}")
-
 def write_to_bigquery(data: dict):
     client = get_bigquery_client()
     if not client:
         return
-
     table_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
     data["timestamp"] = datetime.now().isoformat()
-    
     errors = client.insert_rows_json(table_id, [data])
     if errors:
         print(f"Error insertando en BigQuery: {errors}")
     else:
         print("Datos insertados en BigQuery correctamente.")
 
-@app.post("/api/save-client")
-async def save_client(info: ClientData, background_tasks: BackgroundTasks):
-    try:
-        client_dict = info.model_dump()
-        # Backup local
-        background_tasks.add_task(write_to_file, client_dict.copy())
-        # Subida a BigQuery
-        background_tasks.add_task(write_to_bigquery, client_dict.copy())
+# Pydantic Schemas
+class TokenReq(BaseModel):
+    token: str
+
+class ClientProfileBase(BaseModel):
+    age: str
+    weight: str
+    goal: str
+    planType: str
+    startDate: str
+    endDate: str
+    controlDate: str
+
+class ClientDataReq(BaseModel):
+    email: str
+    name: str
+    profile: ClientProfileBase
+    isRenewal: Optional[bool] = False
+
+class RoutineReq(BaseModel):
+    client_email: str
+    routine_data: str # JSON string of the whole routine
+
+# ====================
+# Auth Endpoints
+# ====================
+@app.post("/api/auth/google")
+def google_auth(req: TokenReq, db: Session = Depends(get_db)):
+    idinfo = auth.verify_google_token(req.token)
+    email = idinfo.get("email")
+    name = idinfo.get("name")
+    
+    user = db.query(models.User).filter(models.User.email == email).first()
+    
+    admin_emails = ["acostavi1204@gmail.com"]
+    coach_emails = ["bodybyja2026@gmail.com"]
+    
+    expected_role = "Client"
+    if email in admin_emails:
+        expected_role = "Admin"
+    elif email in coach_emails:
+        expected_role = "Coach"
+
+    if not user:
+        user = models.User(email=email, name=name, role=expected_role, google_id=idinfo.get("sub"))
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        # Si el usuario ya existía pero su rol debe ser Admin o Coach, se lo actualizamos
+        if user.role != expected_role and expected_role != "Client":
+            user.role = expected_role
+            db.commit()
+            db.refresh(user)
+            
+        # Opcionalmente, si le quitamos el permiso de admin/coach lo bajamos a client:
+        if expected_role == "Client" and user.role in ["Admin", "Coach"]:
+            user.role = "Client"
+            db.commit()
+            db.refresh(user)
+
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.email, "role": user.role}, expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer", "role": user.role, "name": user.name, "email": user.email}
+
+
+# ====================
+# Coach Endpoints
+# ====================
+@app.get("/api/coach/clients")
+def get_clients(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    users = db.query(models.User).filter(models.User.role == "Client").all()
+    results = []
+    for u in users:
+        prof = u.profile
+        results.append({
+            "id": u.id,
+            "email": u.email,
+            "name": u.name,
+            "profile": {
+                "age": prof.age if prof else "",
+                "weight": prof.weight if prof else "",
+                "goal": prof.goal if prof else "",
+                "planType": prof.plan_type if prof else "Mensual",
+                "startDate": prof.start_date if prof else "",
+                "endDate": prof.end_date if prof else "",
+                "controlDate": prof.control_date if prof else ""
+            }
+        })
+    return results
+
+@app.post("/api/coach/clients")
+def save_client_profile(req: ClientDataReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    user = db.query(models.User).filter(models.User.email == req.email).first()
+    if not user:
+        user = models.User(email=req.email, name=req.name, role="Client")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        user.name = req.name
+        db.commit()
+
+    profile = db.query(models.ClientProfile).filter(models.ClientProfile.user_id == user.id).first()
+    is_new_profile = False
+    if not profile:
+        profile = models.ClientProfile(user_id=user.id)
+        db.add(profile)
+        is_new_profile = True
+    
+    profile.age = req.profile.age
+    profile.weight = req.profile.weight
+    profile.goal = req.profile.goal
+    profile.control_date = req.profile.controlDate
+
+    if is_new_profile or req.isRenewal:
+        profile.plan_type = req.profile.planType
+        profile.start_date = req.profile.startDate
+        profile.end_date = req.profile.endDate
+
+    db.commit()
+
+    return {"status": "success", "message": "Atleta registrado en DB", "user_id": user.id}
+
+@app.put("/api/coach/clients/{user_id}")
+def update_client_profile(user_id: int, req: ClientDataReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-        return {"status": "success", "message": "Atleta registrado"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    # Check if the new email already exists in ANOTHER user
+    new_email = req.email.strip()
+    existing = db.query(models.User).filter(models.User.email == new_email, models.User.id != user_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Este correo ya está siendo usado por otro atleta.")
+        
+    user.email = new_email
+    user.name = req.name.strip()
+    db.commit()
+    
+    profile = db.query(models.ClientProfile).filter(models.ClientProfile.user_id == user.id).first()
+    if profile:
+        profile.age = req.profile.age
+        profile.weight = req.profile.weight
+        profile.goal = req.profile.goal
+        profile.control_date = req.profile.controlDate
+        
+        if req.isRenewal:
+            profile.plan_type = req.profile.planType
+            profile.start_date = req.profile.startDate
+            profile.end_date = req.profile.endDate
+            
+        db.commit()
+
+    return {"status": "success", "message": "Atleta actualizado correctamente", "user_id": user.id}
+
+@app.post("/api/coach/routines")
+def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    client_user = db.query(models.User).filter(models.User.email == req.client_email).first()
+    if not client_user:
+        raise HTTPException(status_code=404, detail="Client not found. Register client profile first.")
+
+    # Guardar en SQLite
+    new_routine = models.Routine(user_id=client_user.id, routine_data=req.routine_data)
+    db.add(new_routine)
+    db.commit()
+
+    # Preparar datos analíticos para BigQuery
+    prof = client_user.profile
+    bq_data = {
+        "name": client_user.name,
+        "id": getattr(client_user, 'id', ""),
+        "goal": prof.goal if prof else "",
+        "weight": prof.weight if prof else "",
+        "planType": prof.plan_type if prof else "",
+        "startDate": prof.start_date if prof else "",
+        "endDate": prof.end_date if prof else "",
+        "controlDate": prof.control_date if prof else ""
+    }
+    background_tasks.add_task(write_to_bigquery, bq_data.copy())
+
+    return {"status": "success", "message": "Routine published and backed up to BigQuery"}
+
+@app.get("/api/coach/routine/{client_email}")
+def get_client_routine_by_coach(client_email: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    client_user = db.query(models.User).filter(models.User.email == client_email).first()
+    if not client_user:
+        return {"status": "empty", "routine_data": None}
+    routine = db.query(models.Routine).filter(models.Routine.user_id == client_user.id).order_by(models.Routine.created_at.desc()).first()
+    if not routine:
+        return {"status": "empty", "routine_data": None}
+    return {"status": "success", "routine_data": routine.routine_data}
+
+# ====================
+# Client Endpoints
+# ====================
+@app.get("/api/client/my-routine")
+def get_my_routine(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    # Fetch the latest routine
+    routine = db.query(models.Routine).filter(models.Routine.user_id == current_user.id).order_by(models.Routine.created_at.desc()).first()
+    
+    if not routine:
+        return {"status": "empty", "routine_data": None}
+    
+    prof = current_user.profile
+    profile_data = {
+        "age": prof.age if prof else "",
+        "weight": prof.weight if prof else "",
+        "goal": prof.goal if prof else "",
+        "planType": prof.plan_type if prof else "",
+        "startDate": prof.start_date if prof else "",
+        "endDate": prof.end_date if prof else "",
+        "controlDate": prof.control_date if prof else ""
+    }
+    
+    return {
+        "status": "success", 
+        "routine_data": routine.routine_data,
+        "profile": profile_data
+    }
 
 @app.get("/")
 def read_root():
-    return {"message": "BodyByJA API con soporte de BigQuery"}
+    return {"message": "BodyByJA API con SQLite, Auth y BigQuery"}

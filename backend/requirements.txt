@@ -2,3 +2,8 @@ fastapi
 uvicorn
 pydantic
 google-cloud-bigquery
+sqlalchemy
+pyjwt
+google-auth
+google-auth-httplib2
+passlib[bcrypt]
