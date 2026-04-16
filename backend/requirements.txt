@@ -7,3 +7,4 @@ pyjwt
 google-auth
 google-auth-httplib2
 passlib[bcrypt]
+python-jose

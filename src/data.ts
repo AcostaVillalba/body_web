@@ -10,7 +10,7 @@ export const EXERCISES_DB: Record<string, string[]> = {
   "FEMORAL": ["Peso muerto con barra", "Peso muerto unipodal", "Curl acostado", "Curl acostado unipodal", "Curl sentado", "Curl sentado unipodal", "Prensa alta"],
   "GLUTEO": ["Sentadilla libre", "Reverso", "Sentadilla búlgara con inclinación", "Step up con mancuerna", "Patada en polea", "Tijera estatica en Smith", "Sentadilla sumo con barra", "Hip thrusts", "Hip thrusts unipodal", "Puente con banda", "Puente con propio peso", "Puente con balón Fit ball", "Extensión de cadera con mancuerna", "Abducción en máquina", "Abducción unipodal en polea"],
   "PANTORRILLA": ["Pantorrilla en prensa", "Pantorrilla en hack", "Planti flexión dorsi flexión en máquina ", "Elevación de talones de pie sin peso", "Elevación de talones en máquina Smit", "Elevación de talones en máquina sentado", "Elevación de talones unipodal con peso", "Elevación de talones unipodal sin peso"],
-  "SALTOS": ["Saltar cuerda", "Burpees", "Jumping jacks", "Sprints", "Columpios"],
+  "FUNCIONAL": ["Saltar cuerda", "Burpees", "Jumping jacks", "Sprints", "Columpios"],
   "CARDIO": ["Caminadora", "Bicicleta estática", "Elíptica", "Escaladora"]
 };
 

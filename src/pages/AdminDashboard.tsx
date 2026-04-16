@@ -168,6 +168,7 @@ const AdminDashboard = () => {
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Nombre</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Email</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Plan / Objetivo</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
                       </tr>
                     </thead>
@@ -181,6 +182,25 @@ const AdminDashboard = () => {
                               {c.profile?.planType || 'Mensual'}
                             </span>
                             <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>{c.profile?.goal || 'N/A'}</div>
+                          </td>
+                          <td style={{ padding: '20px' }}>
+                            {c.profile?.endDate ? (
+                              <span style={{
+                                display: 'inline-block',
+                                background: '#c3e3f9ff',
+                                color: '#040faaff',
+                                border: '1px solid #caf0feff',
+                                padding: '5px 12px',
+                                borderRadius: 20,
+                                fontSize: '12px',
+                                fontWeight: 800,
+                                letterSpacing: '0.5px'
+                              }}>
+                                {c.profile.endDate}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>—</span>
+                            )}
                           </td>
                           <td style={{ padding: '20px', textAlign: 'right' }}>
                             <button
@@ -210,7 +230,7 @@ const AdminDashboard = () => {
                       ))}
                       {filteredClients.length === 0 && (
                         <tr>
-                          <td colSpan={4} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                          <td colSpan={5} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
                             {clients.length === 0 ? 'No hay atletas registrados aún.' : 'No se encontraron resultados para la búsqueda.'}
                           </td>
                         </tr>
