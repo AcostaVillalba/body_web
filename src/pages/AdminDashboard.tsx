@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Users, PlusCircle, Edit3, Settings, X, Save, Search } from 'lucide-react';
+import { LogOut, Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import CoachDashboard, { type RoutineDay } from './CoachDashboard';
 import '../App.css';
 
@@ -12,6 +12,15 @@ const AdminDashboard = () => {
   const [editingRoutine, setEditingRoutine] = useState<RoutineDay[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    status: 'all',
+    planType: 'all',
+    dateType: 'end', // 'start' o 'end'
+    dateSort: 'desc'
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   // Edit Profile State
   const [editingProfile, setEditingProfile] = useState<any | null>(null);
@@ -28,15 +37,56 @@ const AdminDashboard = () => {
     }
   }, [activeTab, editingClientEmail]);
 
+  // Reset to page 1 when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filters]);
+
   const fetchClients = async () => {
     try {
       const res = await fetch('http://localhost:8000/api/coach/clients', { headers: authHeaders });
+
+      if (res.status === 403) {
+        const data = await res.json();
+        if (data.detail && String(data.detail).toLowerCase().includes("plan ha expirado")) {
+          logout();
+          return;
+        }
+      }
+
       if (res.ok) {
         const data = await res.json();
         setClients(data);
       }
     } catch (e) {
       console.error("Error fetching clients", e);
+    }
+  };
+
+  const handleToggleStatus = async (userId: number, currentStatus: boolean) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ is_active: !currentStatus })
+      });
+
+      if (res.status === 403) {
+        const data = await res.json();
+        if (data.detail && String(data.detail).toLowerCase().includes("plan ha expirado")) {
+          logout();
+          return;
+        }
+      }
+
+      if (res.ok) {
+        setClients(prev => prev.map(c => c.id === userId ? { ...c, is_active: !currentStatus } : c));
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Error al actualizar estado");
+      }
+    } catch (e) {
+      console.error("Error toggling status", e);
     }
   };
 
@@ -140,24 +190,146 @@ const AdminDashboard = () => {
 
           {/* TAB 1: USERS */}
           {activeTab === 'users' && !editingClientEmail && (() => {
-            const filteredClients = clients.filter(c =>
-              c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              c.email.toLowerCase().includes(searchQuery.toLowerCase())
-            );
+            const filteredClients = clients.filter(c => {
+              const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.email.toLowerCase().includes(searchQuery.toLowerCase());
+              const matchesStatus = filters.status === 'all' ||
+                (filters.status === 'active' ? c.is_active : !c.is_active);
+              const matchesPlan = filters.planType === 'all' ||
+                (c.profile?.planType === filters.planType);
+
+              return matchesSearch && matchesStatus && matchesPlan;
+            }).sort((a, b) => {
+              const field = filters.dateType === 'start' ? 'startDate' : 'endDate';
+              const dateA = a.profile?.[field] ? new Date(a.profile[field]).getTime() : 0;
+              const dateB = b.profile?.[field] ? new Date(b.profile[field]).getTime() : 0;
+              return filters.dateSort === 'desc' ? dateB - dateA : dateA - dateB;
+            });
+
+            const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+            const paginatedClients = filteredClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+            // Pagination Helper: generate page numbers with ellipsis
+            const getPageNumbers = () => {
+              const pages: (number | string)[] = [];
+              if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+              } else {
+                pages.push(1);
+                if (currentPage > 3) pages.push('...');
+
+                const start = Math.max(2, currentPage - 1);
+                const end = Math.min(totalPages - 1, currentPage + 1);
+
+                for (let i = start; i <= end; i++) {
+                  if (!pages.includes(i)) pages.push(i);
+                }
+
+                if (currentPage < totalPages - 2) pages.push('...');
+                if (!pages.includes(totalPages)) pages.push(totalPages);
+              }
+              return pages;
+            };
 
             return (
               <div style={{ padding: 40 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                   <div className="section-title" style={{ marginTop: 0, marginBottom: 0 }}>Listado de Atletas ({filteredClients.length})</div>
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '10px 16px', borderRadius: 8, border: '2px solid #e2e8f0', width: 320, transition: 'all 0.2s' }}>
-                    <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
-                    <input
-                      type="text"
-                      placeholder="Buscar por nombre o email..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '13px', color: '#1e293b' }}
-                    />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setIsFilterOpen(!isFilterOpen)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, background: isFilterOpen ? '#c5a021' : '#fff',
+                          color: isFilterOpen ? '#fff' : '#1e293b', border: '2px solid', borderColor: isFilterOpen ? '#c5a021' : '#e2e8f0',
+                          padding: '10px 16px', borderRadius: 8, fontSize: '13px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                        }}>
+                        <Filter size={16} /> FILTRAR <ChevronDown size={14} style={{ transform: isFilterOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                      </button>
+
+                      {isFilterOpen && (
+                        <div style={{
+                          position: 'absolute', top: '100%', right: 0, marginTop: 8, width: 280, background: '#fff',
+                          borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', zIndex: 100, padding: 20
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: '#111' }}>OPCIONES DE FILTRO</span>
+                            <button
+                              onClick={() => setFilters({ status: 'all', planType: 'all', dateType: 'end', dateSort: 'desc' })}
+                              style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <RotateCcw size={12} /> Limpiar
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                            <div>
+                              <label style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', display: 'block', marginBottom: 6 }}>ESTADO DE ACCESO</label>
+                              <select
+                                value={filters.status}
+                                onChange={e => setFilters({ ...filters, status: e.target.value })}
+                                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                <option value="all">Todos los estados</option>
+                                <option value="active">Solo Activos</option>
+                                <option value="inactive">Solo Inactivos</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', display: 'block', marginBottom: 6 }}>TIPO DE PLAN</label>
+                              <select
+                                value={filters.planType}
+                                onChange={e => setFilters({ ...filters, planType: e.target.value })}
+                                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                <option value="all">Todos los planes</option>
+                                <option value="Mensual">Mensual</option>
+                                <option value="Dos meses">Dos meses</option>
+                                <option value="Trimestral">Trimestral</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', display: 'block', marginBottom: 6 }}>BASE DE FECHA</label>
+                              <select
+                                value={filters.dateType}
+                                onChange={e => setFilters({ ...filters, dateType: e.target.value })}
+                                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 15 }}>
+                                <option value="end">Fecha de Finalización</option>
+                                <option value="start">Fecha de Inicio</option>
+                              </select>
+
+                              <label style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', display: 'block', marginBottom: 6 }}>ORDEN DE FECHA</label>
+                              <select
+                                value={filters.dateSort}
+                                onChange={e => setFilters({ ...filters, dateSort: e.target.value })}
+                                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                {filters.dateType === 'start' ? (
+                                  <>
+                                    <option value="desc">Más reciente</option>
+                                    <option value="asc">Más antiguo</option>
+                                  </>
+                                ) : (
+                                  <>
+                                    <option value="asc">Próximos a vencer</option>
+                                    <option value="desc">Vencimiento más lejano</option>
+                                  </>
+                                )}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '10px 16px', borderRadius: 8, border: '2px solid #e2e8f0', width: 320, transition: 'all 0.2s' }}>
+                      <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre o email..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '13px', color: '#1e293b' }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -168,12 +340,14 @@ const AdminDashboard = () => {
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Nombre</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Email</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Plan / Objetivo</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>Inicio del Plan</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>Estado de Acceso</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredClients.map(c => (
+                      {paginatedClients.map(c => (
                         <tr key={c.email} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
                           <td style={{ padding: '20px', fontWeight: 700, color: '#1e293b' }}>{c.name}</td>
                           <td style={{ padding: '20px', color: '#64748b', fontSize: '14px' }}>{c.email}</td>
@@ -182,6 +356,25 @@ const AdminDashboard = () => {
                               {c.profile?.planType || 'Mensual'}
                             </span>
                             <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>{c.profile?.goal || 'N/A'}</div>
+                          </td>
+                          <td style={{ padding: '20px' }}>
+                            {c.profile?.startDate ? (
+                              <span style={{
+                                display: 'inline-block',
+                                background: '#fbf0fdff',
+                                color: '#571665ff',
+                                border: '1px solid #f6dcfcff',
+                                padding: '5px 12px',
+                                borderRadius: 20,
+                                fontSize: '12px',
+                                fontWeight: 800,
+                                letterSpacing: '0.5px'
+                              }}>
+                                {c.profile.startDate}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>—</span>
+                            )}
                           </td>
                           <td style={{ padding: '20px' }}>
                             {c.profile?.endDate ? (
@@ -201,6 +394,33 @@ const AdminDashboard = () => {
                             ) : (
                               <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>—</span>
                             )}
+                          </td>
+                          <td style={{ padding: '20px' }}>
+                            <button
+                              onClick={() => handleToggleStatus(c.id, c.is_active)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '6px 12px',
+                                borderRadius: 20,
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: 800,
+                                fontSize: '11px',
+                                transition: 'all 0.2s',
+                                background: c.is_active ? '#dcfce7' : '#fee2e2',
+                                color: c.is_active ? '#166534' : '#991b1b',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                              }}
+                              title={c.is_active ? 'Desactivar acceso' : 'Activar acceso'}
+                            >
+                              {c.is_active ? (
+                                <><Shield size={14} /> ACTIVO</>
+                              ) : (
+                                <><ShieldOff size={14} /> INACTIVO</>
+                              )}
+                            </button>
                           </td>
                           <td style={{ padding: '20px', textAlign: 'right' }}>
                             <button
@@ -228,9 +448,9 @@ const AdminDashboard = () => {
                           </td>
                         </tr>
                       ))}
-                      {filteredClients.length === 0 && (
+                      {paginatedClients.length === 0 && (
                         <tr>
-                          <td colSpan={5} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                          <td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
                             {clients.length === 0 ? 'No hay atletas registrados aún.' : 'No se encontraron resultados para la búsqueda.'}
                           </td>
                         </tr>
@@ -238,6 +458,60 @@ const AdminDashboard = () => {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 30, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
+                      Mostrando <span style={{ color: '#111' }}>{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</span> a <span style={{ color: '#111' }}>{Math.min(currentPage * ITEMS_PER_PAGE, filteredClients.length)}</span> de <span style={{ color: '#111' }}>{filteredClients.length}</span> resultados
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => prev - 1)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0',
+                          background: '#fff', color: currentPage === 1 ? '#cbd5e1' : '#1e293b', cursor: currentPage === 1 ? 'default' : 'pointer',
+                          fontSize: '13px', fontWeight: 700, transition: 'all 0.2s'
+                        }}
+                      >
+                        <ChevronLeft size={16} /> Anterior
+                      </button>
+
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        {getPageNumbers().map((p, idx) => (
+                          <button
+                            key={idx}
+                            disabled={p === '...'}
+                            onClick={() => typeof p === 'number' && setCurrentPage(p)}
+                            style={{
+                              minWidth: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              borderRadius: 8, border: '1px solid', borderColor: p === currentPage ? '#111' : p === '...' ? 'transparent' : '#e2e8f0',
+                              background: p === currentPage ? '#111' : 'transparent',
+                              color: p === currentPage ? '#fff' : p === '...' ? '#94a3b8' : '#1e293b',
+                              cursor: p === '...' ? 'default' : 'pointer', fontSize: '13px', fontWeight: 800, transition: 'all 0.2s'
+                            }}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0',
+                          background: '#fff', color: currentPage === totalPages ? '#cbd5e1' : '#1e293b', cursor: currentPage === totalPages ? 'default' : 'pointer',
+                          fontSize: '13px', fontWeight: 700, transition: 'all 0.2s'
+                        }}
+                      >
+                        Siguiente <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}

@@ -7,10 +7,16 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
 
   if (!isAuthenticated) {
     // Si no está logueado, lo mandamos al login
+    return <Navigate to="/login" replace />;
+  }
+
+  // Logica de Soft Delete: Si el usuario es desactivado mientras navega, lo sacamos
+  if (user && (user.isActive === false || String(user.isActive) === "0")) {
+    logout();
     return <Navigate to="/login" replace />;
   }
 

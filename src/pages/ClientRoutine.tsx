@@ -21,6 +21,15 @@ const ClientRoutine = () => {
                 const res = await fetch('http://localhost:8000/api/client/my-routine', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+
+                if (res.status === 403) {
+                    const data = await res.json();
+                    if (data.detail && data.detail.includes("plan ha expirado")) {
+                        logout();
+                        return;
+                    }
+                }
+
                 if (res.ok) {
                     const data = await res.json();
                     if (data.routine_data) {

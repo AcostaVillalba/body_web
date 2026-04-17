@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, TIMESTAMP
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, TIMESTAMP, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
@@ -11,6 +11,7 @@ class User(Base):
     name = Column(String)
     role = Column(String, default="Client") # "Admin", "Coach", "Client"
     google_id = Column(String, unique=True, nullable=True)
+    is_active = Column(Boolean, default=True)
 
     profile = relationship("ClientProfile", back_populates="user", uselist=False)
     routines = relationship("Routine", back_populates="user")

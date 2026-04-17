@@ -70,6 +70,9 @@ class ClientDataReq(BaseModel):
     profile: ClientProfileBase
     isRenewal: Optional[bool] = False
 
+class UserStatusReq(BaseModel):
+    is_active: bool
+
 class RoutineReq(BaseModel):
     client_email: str
     routine_data: str # JSON string of the whole routine
@@ -117,7 +120,7 @@ def google_auth(req: TokenReq, db: Session = Depends(get_db)):
         data={"sub": user.email, "role": user.role}, expires_delta=access_token_expires
     )
     
-    return {"access_token": access_token, "token_type": "bearer", "role": user.role, "name": user.name, "email": user.email}
+    return {"access_token": access_token, "token_type": "bearer", "role": user.role, "name": user.name, "email": user.email, "is_active": bool(user.is_active)}
 
 
 # ====================
@@ -141,7 +144,8 @@ def get_clients(db: Session = Depends(get_db), current_user: models.User = Depen
                 "startDate": prof.start_date if prof else "",
                 "endDate": prof.end_date if prof else "",
                 "controlDate": prof.control_date if prof else ""
-            }
+            },
+            "is_active": bool(u.is_active)
         })
     return results
 
@@ -209,6 +213,17 @@ def update_client_profile(user_id: int, req: ClientDataReq, db: Session = Depend
         db.commit()
 
     return {"status": "success", "message": "Atleta actualizado correctamente", "user_id": user.id}
+
+@app.patch("/api/admin/users/{user_id}/status")
+def update_user_status(user_id: int, req: UserStatusReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    user.is_active = req.is_active
+    db.commit()
+    
+    return {"status": "success", "message": "Estado de usuario actualizado", "is_active": bool(user.is_active)}
 
 @app.post("/api/coach/routines")
 def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):

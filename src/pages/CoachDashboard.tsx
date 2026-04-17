@@ -39,6 +39,7 @@ interface AthleteData {
   email: string;
   name: string;
   profile: AthleteProfile;
+  is_active?: boolean;
 }
 
 export interface CoachDashboardProps {
@@ -61,6 +62,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
   const emptyAthlete: AthleteData = {
     email: '',
     name: '',
+    is_active: true,
     profile: {
       age: '',
       weight: '',
@@ -96,6 +98,9 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
 
   useEffect(() => {
     fetchClients();
+    // Poll for changes every 30 seconds to keep status in sync
+    const interval = setInterval(fetchClients, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -119,9 +124,30 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
   const fetchClients = async () => {
     try {
       const res = await fetch('http://localhost:8000/api/coach/clients', { headers: authHeaders });
-      if (res.ok) {
+      
+      if (res.status === 403) {
         const data = await res.json();
+        if (data.detail && String(data.detail).toLowerCase().includes("plan ha expirado")) {
+          logout();
+          return;
+        }
+      }
+
+      if (res.ok) {
+        const data: AthleteData[] = await res.json();
         setClients(data);
+        
+        // Sincronizar el atleta seleccionado actualmente si hubo cambios en el servidor
+        if (athlete.email) {
+          const updatedSelected = data.find(c => c.email === athlete.email);
+          if (updatedSelected) {
+            setAthlete(prev => ({
+              ...updatedSelected,
+              // Mantener flags locales como isRenewalActive
+              ...((prev as any).isRenewalActive !== undefined ? { isRenewalActive: (prev as any).isRenewalActive } : {})
+            }));
+          }
+        }
       }
     } catch (e) {
       console.error("Error fetching clients", e);
@@ -261,6 +287,15 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
         headers: authHeaders,
         body: JSON.stringify({ ...athlete, isRenewal: isRenewalActive })
       });
+      
+      if (profRes.status === 403) {
+        const data = await profRes.json();
+        if (data.detail && String(data.detail).toLowerCase().includes("plan ha expirado")) {
+          logout();
+          return;
+        }
+      }
+
       if (!profRes.ok) throw new Error("Error guardando el perfil del atleta");
 
       // 2. Guardar la Rutina
@@ -345,6 +380,26 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
                 <option key={c.email} value={c.email}>{c.name} ({c.email})</option>
               ))}
             </select>
+          </div>
+
+          <div className="field">
+            <label>Estado de Acceso</label>
+            <div style={{ 
+              padding: '10px', 
+              borderRadius: '8px', 
+              background: athlete.is_active ? '#dcfce7' : '#fee2e2',
+              color: athlete.is_active ? '#166534' : '#ef4444',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              textAlign: 'center',
+              border: athlete.is_active ? '1px solid #166534' : '1px solid #ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}>
+              {athlete.is_active ? '✅ ACTIVO' : '❌ INACTIVO'}
+            </div>
           </div>
 
           <div className="field">

@@ -27,11 +27,16 @@ const Login = () => {
       }
 
       const data = await res.json();
+      
+      if (data.is_active === false) {
+        throw new Error("Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso.");
+      }
 
       login(data.access_token, {
         name: data.name,
         email: data.email,
-        role: data.role
+        role: data.role,
+        isActive: data.is_active
       });
 
       if (data.role === 'Admin') {
