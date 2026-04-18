@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, ChevronDown, ChevronUp } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronUp, History, X } from 'lucide-react';
 import logoBody2 from '../assets/logobody2.jpeg';
 import logoBody from '../assets/logobody.png'; // Watermark
 import { EXERCISES_DB } from '../data';
@@ -14,6 +14,8 @@ const ClientRoutine = () => {
     const [showRecommendations, setShowRecommendations] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const [showCoachInfo, setShowCoachInfo] = useState(false);
+    const [showWeightHistory, setShowWeightHistory] = useState(false);
+    const [weightHistory, setWeightHistory] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchRoutine = async () => {
@@ -48,6 +50,25 @@ const ClientRoutine = () => {
 
         fetchRoutine();
     }, [token]);
+
+    useEffect(() => {
+        const fetchHistory = async () => {
+            if (!token) return;
+            try {
+                const res = await fetch('http://localhost:8000/api/client/weight-history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setWeightHistory(data);
+                }
+            } catch (err) {
+                console.error("Failed to load weight history");
+            }
+        };
+
+        if (token) fetchHistory();
+    }, [token, showWeightHistory]);
 
     const getDayAbbr = (dayName: string) => {
         const dayMap: { [key: string]: string } = {
@@ -228,8 +249,101 @@ const ClientRoutine = () => {
                                                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#1e40af' }}>{profile.controlDate}</span>
                                             </div>
                                         </div>
+
+                                        {/* History Button */}
+                                        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                                            <button
+                                                onClick={() => setShowWeightHistory(true)}
+                                                style={{
+                                                    background: '#111',
+                                                    color: '#c5a021',
+                                                    padding: '10px 25px',
+                                                    borderRadius: '50px',
+                                                    border: '2px solid #c5a021',
+                                                    fontWeight: 800,
+                                                    fontSize: '12px',
+                                                    textTransform: 'uppercase',
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    transition: 'all 0.3s',
+                                                    boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                                                }}
+                                                onMouseOver={e => {
+                                                    e.currentTarget.style.background = '#c5a021';
+                                                    e.currentTarget.style.color = '#fff';
+                                                }}
+                                                onMouseOut={e => {
+                                                    e.currentTarget.style.background = '#111';
+                                                    e.currentTarget.style.color = '#c5a021';
+                                                }}
+                                            >
+                                                <History size={16} /> Ver Histórico de Peso
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Weight History Modal */}
+                        {showWeightHistory && (
+                            <div style={{
+                                position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                                background: 'rgba(0,0,0,0.8)', zIndex: 1000,
+                                display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                padding: '20px', backdropFilter: 'blur(5px)'
+                            }}>
+                                <div style={{
+                                    background: '#fff', width: '100%', maxWidth: '500px',
+                                    borderRadius: '24px', overflow: 'hidden',
+                                    animation: 'fadeIn 0.3s ease-out',
+                                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+                                }}>
+                                    <div style={{
+                                        background: '#111', color: '#c5a021', padding: '20px 25px',
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                    }}>
+                                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                            Historial de Peso
+                                        </h3>
+                                        <button onClick={() => setShowWeightHistory(false)} style={{ background: 'transparent', border: 'none', color: '#c5a021', cursor: 'pointer' }}>
+                                            <X size={24} />
+                                        </button>
+                                    </div>
+
+                                    <div style={{ padding: '25px', maxHeight: '70vh', overflowY: 'auto' }}>
+                                        {weightHistory.length === 0 ? (
+                                            <p style={{ textAlign: 'center', color: '#666', padding: '20px' }}>No hay registros históricos aún.</p>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                                {weightHistory.map((item) => (
+                                                    <div key={item.id} style={{
+                                                        background: '#f8fafc', padding: '15px 20px', borderRadius: '16px',
+                                                        borderLeft: '5px solid #c5a021', display: 'flex',
+                                                        justifyContent: 'space-between', alignItems: 'center',
+                                                        boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
+                                                    }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '10px', fontWeight: 800, color: '#a38210', textTransform: 'uppercase' }}>{item.date}</div>
+                                                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#444', marginTop: '4px' }}>{item.notes || 'Registro de peso'}</div>
+                                                        </div>
+                                                        <div style={{ textAlign: 'right' }}>
+                                                            <div style={{ fontSize: '24px', fontWeight: 900, color: '#111' }}>{item.weight}<span style={{ fontSize: '14px', marginLeft: '2px' }}>kg</span></div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div style={{ padding: '20px 25px', background: '#f1f5f9', textAlign: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+                                            Registrado automáticamente con cada actualización
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         )}
 

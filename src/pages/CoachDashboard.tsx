@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { EXERCISES_DB, getImageUrl } from '../data';
-import { LogOut } from 'lucide-react';
+import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft } from 'lucide-react';
 import '../App.css';
 
 interface ExerciseSubRow {
@@ -47,10 +47,15 @@ export interface CoachDashboardProps {
   preloadedRoutine?: RoutineDay[];
   hideHeader?: boolean;
   onCancel?: () => void;
+  isReadOnly?: boolean;
 }
 
-const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel }: CoachDashboardProps = {}) => {
+const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) => {
   const { token, logout, user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'create' | 'users'>(preloadedEmail ? 'create' : 'create');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewingEmail, setViewingEmail] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(propIsReadOnly || false);
   const [clients, setClients] = useState<AthleteData[]>([]);
 
   // Auth Headers Helper
@@ -165,6 +170,48 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
       setAthlete(selected);
     }
   };
+
+  const handleViewRoutineFromList = async (clientEmail: string) => {
+    setIsLoading(true);
+    setViewingEmail(clientEmail);
+    setIsReadOnly(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/coach/routine/${clientEmail}`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'success' && data.routine_data) {
+          const routine = JSON.parse(data.routine_data);
+          setRoutineDays(routine);
+          setSelectedDays(routine.map((d: any) => d.name));
+        } else {
+          setRoutineDays([]);
+          setSelectedDays([]);
+        }
+        
+        const client = clients.find(c => c.email === clientEmail);
+        if (client) setAthlete(client);
+      }
+    } catch (e) {
+      console.error("Error loading routine", e);
+    } finally {
+      setIsLoading(false);
+      setActiveTab('create'); // Reutilizamos la vista de creación pero en modo lectura
+    }
+  };
+
+  const handleBackToList = () => {
+    setViewingEmail(null);
+    setIsReadOnly(false);
+    setActiveTab('users');
+    setAthlete(emptyAthlete);
+    setRoutineDays([]);
+    setSelectedDays([]);
+  };
+
+  const filteredClients = clients.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // --- Routine Logic from Previous Code ---
   const handleDayToggle = (day: string) => {
@@ -313,7 +360,11 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
 
       setStatusMsg({ type: 'success', text: '¡Rutina publicada y respaldada exitosamente!' });
       setIsRenewalActive(false);
-      fetchClients(); // Update client dropdown
+      fetchClients(); 
+      
+      // Clear only routine while keeping athlete and message
+      setRoutineDays([]);
+      setSelectedDays([]);
     } catch (err: any) {
       setStatusMsg({ type: 'error', text: err.message || 'Error desconocido' });
     } finally {
@@ -346,14 +397,114 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
             </div>
           </>
         )}
-
-        {onCancel && (
-          <button className="btn" onClick={onCancel} style={{ background: '#e2e8f0', color: '#475569', marginBottom: 20, display: 'inline-flex', gap: 8 }}>
-            ⬅ VOLVER AL LISTADO
-          </button>
+        
+        {/* Tabs Navigation */}
+        {!viewingEmail && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 30 }}>
+            <button
+              onClick={() => setActiveTab('create')}
+              style={{
+                flex: 1, padding: '14px', background: activeTab === 'create' ? '#111' : '#fff', color: activeTab === 'create' ? '#fff' : '#111',
+                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: activeTab === 'create' ? '0 8px 16px rgba(0,0,0,0.1)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+              }}>
+              <PlusCircle size={16} /> CREAR RUTINA
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              style={{
+                flex: 1, padding: '14px', background: activeTab === 'users' ? '#c5a021' : '#fff', color: activeTab === 'users' ? '#fff' : '#111',
+                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: activeTab === 'users' ? '0 8px 16px rgba(197,160,33,0.2)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+              }}>
+              <Users size={16} /> VER USUARIOS
+            </button>
+          </div>
         )}
 
-        {statusMsg.text && (
+        {activeTab === 'users' ? (
+          <div style={{ padding: '0 0 20px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 className="section-title" style={{ margin: 0 }}>Listado de Atletas</h2>
+              <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '10px 16px', borderRadius: 8, border: '2px solid #e2e8f0', width: 300 }}>
+                <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '13px' }}
+                />
+              </div>
+            </div>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    <th style={{ padding: '16px 20px', fontWeight: 800 }}>Nombre</th>
+                    <th style={{ padding: '16px 20px', fontWeight: 800 }}>Email</th>
+                    <th style={{ padding: '16px 20px', fontWeight: 800 }}>Plan</th>
+                    <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
+                    <th style={{ padding: '16px 20px', fontWeight: 800 }}>Estado</th>
+                    <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredClients.map(c => (
+                    <tr key={c.email} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '15px 20px', fontWeight: 700 }}>{c.name}</td>
+                      <td style={{ padding: '15px 20px', color: '#64748b', fontSize: '13px' }}>{c.email}</td>
+                      <td style={{ padding: '15px 20px' }}>
+                        <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: 20, fontSize: '10px', fontWeight: 800 }}>
+                          {c.profile?.planType || 'Mensual'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '15px 20px', fontSize: '13px', fontWeight: 600 }}>{c.profile?.endDate || '—'}</td>
+                      <td style={{ padding: '15px 20px' }}>
+                        <span style={{ 
+                          padding: '4px 10px', borderRadius: 20, fontSize: '10px', fontWeight: 800,
+                          background: c.is_active ? '#dcfce7' : '#fee2e2',
+                          color: c.is_active ? '#166534' : '#991b1b'
+                        }}>
+                          {c.is_active ? '✅ ACTIVO' : '❌ INACTIVO'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '15px 20px', textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleViewRoutineFromList(c.email)}
+                          style={{
+                            background: '#111', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6,
+                            cursor: 'pointer', fontWeight: 700, fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: 6
+                          }}>
+                          <Eye size={14} /> Ver Rutina
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <>
+            {isReadOnly && (
+              <button 
+                className="btn" 
+                onClick={handleBackToList} 
+                style={{ background: '#111', color: '#fff', marginBottom: 20, display: 'inline-flex', gap: 8, padding: '10px 20px' }}
+              >
+                <ArrowLeft size={16} /> VOLVER AL LISTADO DE USUARIOS
+              </button>
+            )}
+
+            {onCancel && !isReadOnly && (
+              <button className="btn" onClick={onCancel} style={{ background: '#e2e8f0', color: '#475569', marginBottom: 20, display: 'inline-flex', gap: 8 }}>
+                ⬅ VOLVER AL LISTADO
+              </button>
+            )}
+
+            {statusMsg.text && (
           <div style={{ padding: 15, borderRadius: 8, marginBottom: 20, background: statusMsg.type === 'error' ? '#fee2e2' : '#dcfce7', color: statusMsg.type === 'error' ? '#ef4444' : '#166534', fontWeight: 600, textAlign: 'center' }}>
             {statusMsg.text}
           </div>
@@ -374,10 +525,14 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
         <div className="grid-inputs">
           <div className="field">
             <label>Seleccionar Cliente D.B.</label>
-            <select onChange={(e) => handleClientSelect(e.target.value)}>
+            <select 
+              onChange={(e) => handleClientSelect(e.target.value)}
+              disabled={isReadOnly}
+              style={isReadOnly ? lockedStyle : {}}
+            >
               <option value="">-- Nuevo Cliente --</option>
               {clients.map(c => (
-                <option key={c.email} value={c.email}>{c.name} ({c.email})</option>
+                <option key={c.email} value={c.email} selected={athlete.email === c.email}>{c.name} ({c.email})</option>
               ))}
             </select>
           </div>
@@ -396,7 +551,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '6px',
+              opacity: isReadOnly ? 0.7 : 1
             }}>
               {athlete.is_active ? '✅ ACTIVO' : '❌ INACTIVO'}
             </div>
@@ -404,17 +560,32 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
 
           <div className="field">
             <label>Email (Req. Google Login)</label>
-            <input type="email" value={athlete.email} onChange={e => setAthlete({ ...athlete, email: e.target.value })} placeholder="email@gmail.com" />
+            <input 
+              type="email" 
+              value={athlete.email} 
+              disabled={isReadOnly || (isExistingClient && user?.role !== 'Admin')}
+              style={(isReadOnly || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
+              onChange={e => setAthlete({ ...athlete, email: e.target.value })} 
+              placeholder="email@gmail.com" 
+            />
           </div>
           <div className="field">
             <label>Nombre del Cliente</label>
-            <input type="text" value={athlete.name} onChange={e => setAthlete({ ...athlete, name: e.target.value })} />
+            <input 
+              type="text" 
+              value={athlete.name} 
+              disabled={isReadOnly || (isExistingClient && user?.role !== 'Admin')}
+              style={(isReadOnly || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
+              onChange={e => setAthlete({ ...athlete, name: e.target.value })} 
+            />
           </div>
           <div className="field">
             <label>Edad</label>
             <input
               type="number"
               value={athlete.profile.age}
+              disabled={isReadOnly}
+              style={isReadOnly ? lockedStyle : {}}
               onChange={e => {
                 const val = e.target.value;
                 if (val.length <= 2) setAthlete({ ...athlete, profile: { ...athlete.profile, age: val } });
@@ -426,6 +597,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
             <input
               type="number"
               value={athlete.profile.weight}
+              disabled={isReadOnly}
+              style={isReadOnly ? lockedStyle : {}}
               onChange={e => {
                 const val = e.target.value;
                 if (val.length <= 3) setAthlete({ ...athlete, profile: { ...athlete.profile, weight: val } });
@@ -434,7 +607,12 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
           </div>
           <div className="field">
             <label>Objetivo</label>
-            <select value={athlete.profile.goal} onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, goal: e.target.value } })}>
+            <select 
+              value={athlete.profile.goal} 
+              disabled={isReadOnly}
+              style={isReadOnly ? lockedStyle : {}}
+              onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, goal: e.target.value } })}
+            >
               <option>Definición Muscular</option>
               <option>Volumen Muscular</option>
               <option>Mantenimiento Físico</option>
@@ -445,8 +623,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
             <label>Tipo de Plan</label>
             <select 
               value={athlete.profile.planType} 
-              disabled={isContractLocked}
-              style={isContractLocked ? lockedStyle : {}}
+              disabled={isReadOnly || isContractLocked}
+              style={(isReadOnly || isContractLocked) ? lockedStyle : {}}
               onChange={e => {
               const newPlan = e.target.value;
               let days = 30;
@@ -465,11 +643,11 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
           <div className="field">
             <label>Fecha de Inicio</label>
             <input
-              type="date"
-              value={athlete.profile.startDate}
-              disabled={isContractLocked}
-              style={isContractLocked ? lockedStyle : {}}
-              onChange={e => {
+               type="date"
+               value={athlete.profile.startDate}
+               disabled={isReadOnly || isContractLocked}
+               style={(isReadOnly || isContractLocked) ? lockedStyle : {}}
+               onChange={e => {
                 const newStart = e.target.value;
                 const dControl = new Date(newStart + 'T12:00:00');
                 dControl.setMonth(dControl.getMonth() + 1);
@@ -491,8 +669,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
             <input
               type="date"
               value={athlete.profile.endDate}
-              disabled={isContractLocked}
-              style={isContractLocked ? lockedStyle : {}}
+              disabled={isReadOnly || isContractLocked}
+              style={(isReadOnly || isContractLocked) ? lockedStyle : {}}
               onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, endDate: e.target.value } })}
             />
           </div>
@@ -501,6 +679,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
             <input 
               type="date" 
               value={athlete.profile.controlDate} 
+              disabled={isReadOnly}
+              style={isReadOnly ? lockedStyle : {}}
               onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, controlDate: e.target.value } })} 
             />
           </div>
@@ -513,14 +693,23 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
               <input
                 type="checkbox"
                 checked={selectedDays.includes(day)}
+                disabled={isReadOnly}
                 onChange={() => handleDayToggle(day)}
               />
               {day}
             </label>
           ))}
-          <button className="btn btn-add-day main-add-btn" onClick={renderDays}>
-            Crear Días
-          </button>
+          {!isReadOnly && (
+            <button 
+              className="btn btn-add-day main-add-btn" 
+              onClick={renderDays}
+              disabled={!athlete.is_active}
+              style={!athlete.is_active ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
+              title={!athlete.is_active ? "No se puede configurar rutina para atletas inactivos" : ""}
+            >
+              Crear Días
+            </button>
+          )}
         </div>
 
         <div id="routine-builder">
@@ -528,13 +717,13 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
             <div key={day.name} className="day-container">
               <div className="day-header">
                 {day.name}
-                <button className="btn btn-add-day" onClick={() => addGroup(day.name)}>+ Bloque</button>
+                {!isReadOnly && <button className="btn btn-add-day" onClick={() => addGroup(day.name)}>+ Bloque</button>}
               </div>
 
               <div className="day-groups">
                 {day.groups.map(group => (
                   <div key={group.id} className="exercise-group">
-                    <button className="btn btn-del" onClick={() => removeGroup(day.name, group.id)}>Eliminar</button>
+                    {!isReadOnly && <button className="btn btn-del" onClick={() => removeGroup(day.name, group.id)}>Eliminar</button>}
 
                     <div className="rows-holder">
                       {group.exercises.map((ex, idx) => (
@@ -547,6 +736,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
                               className="sel-name"
                               placeholder="Buscar ejercicio..."
                               value={ex.name}
+                              disabled={isReadOnly}
+                              style={isReadOnly ? lockedStyle : {}}
                               onChange={(e) => updateExercise(day.name, group.id, ex.id, 'name', e.target.value)}
                               onFocus={(e) => e.target.select()}
                             />
@@ -562,11 +753,12 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
                                     type="text"
                                     placeholder="00"
                                     value={ex.series}
+                                    disabled={isReadOnly}
+                                    style={{ width: 100, ...(isReadOnly ? lockedStyle : {}) }}
                                     onChange={(e) => {
                                       const val = e.target.value;
                                       if (val.length <= 2) updateExercise(day.name, group.id, ex.id, 'series', val);
                                     }}
-                                    style={{ width: 100 }}
                                   />
                                 </div>
                               ) : (
@@ -577,6 +769,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
                                       type="text"
                                       placeholder="S"
                                       value={ex.series}
+                                      disabled={isReadOnly}
+                                      style={isReadOnly ? lockedStyle : {}}
                                       onChange={(e) => {
                                         const val = e.target.value;
                                         if (val.length <= 1) updateExercise(day.name, group.id, ex.id, 'series', val);
@@ -589,6 +783,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
                                       type="text"
                                       placeholder="R"
                                       value={ex.reps}
+                                      disabled={isReadOnly}
+                                      style={isReadOnly ? lockedStyle : {}}
                                       onChange={(e) => {
                                         const val = e.target.value;
                                         if (val.length <= 3) updateExercise(day.name, group.id, ex.id, 'reps', val);
@@ -605,6 +801,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
                             <textarea
                               rows={3}
                               value={ex.note}
+                              disabled={isReadOnly}
+                              style={isReadOnly ? lockedStyle : {}}
                               onChange={(e) => updateExercise(day.name, group.id, ex.id, 'note', e.target.value)}
                             />
                           </div>
@@ -620,7 +818,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
                       ))}
                     </div>
 
-                    {group.exercises.length < 2 && (
+                    {!isReadOnly && group.exercises.length < 2 && (
                       <button className="btn btn-biserie" onClick={() => addBiserie(day.name, group.id)}>
                         + AGREGAR BISERIE
                       </button>
@@ -635,9 +833,33 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
           ))}
         </div>
 
-        <button className="btn btn-generate" onClick={publishRoutine} disabled={isLoading}>
-          {isLoading ? 'PUBLICANDO...' : 'PUBLICAR RUTINA'}
-        </button>
+        {!isReadOnly && (
+          <button 
+            className="btn btn-generate" 
+            onClick={publishRoutine} 
+            disabled={isLoading || !athlete.is_active}
+            style={!athlete.is_active ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
+            title={!athlete.is_active ? "No se puede publicar rutina para atletas inactivos" : ""}
+          >
+            {isLoading ? 'PUBLICANDO...' : (!athlete.is_active ? 'USUARIO INACTIVO' : 'PUBLICAR RUTINA')}
+          </button>
+        )}
+
+        {statusMsg.text && (
+          <div style={{ 
+            marginTop: 20,
+            padding: 15, 
+            borderRadius: 8, 
+            background: statusMsg.type === 'error' ? '#fee2e2' : '#dcfce7', 
+            color: statusMsg.type === 'error' ? '#ef4444' : '#166534', 
+            fontWeight: 600, 
+            textAlign: 'center' 
+          }}>
+            {statusMsg.text}
+          </div>
+        )}
+          </>
+        )}
       </div>
     </>
   );

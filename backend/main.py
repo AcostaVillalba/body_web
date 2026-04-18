@@ -180,6 +180,10 @@ def save_client_profile(req: ClientDataReq, db: Session = Depends(get_db), curre
 
     db.commit()
 
+    # Registrar en histórico SOLO si es un nuevo atleta o si no hay registros previos
+    if is_new_profile:
+        record_weight_history(db, user.id, req.profile.weight, notes="Registro inicial del atleta")
+
     return {"status": "success", "message": "Atleta registrado en DB", "user_id": user.id}
 
 @app.put("/api/coach/clients/{user_id}")
@@ -212,6 +216,8 @@ def update_client_profile(user_id: int, req: ClientDataReq, db: Session = Depend
             
         db.commit()
 
+        # No se registra peso aquí, se deja para cuando se publique una rutina (según instrucción del usuario)
+
     return {"status": "success", "message": "Atleta actualizado correctamente", "user_id": user.id}
 
 @app.patch("/api/admin/users/{user_id}/status")
@@ -225,6 +231,39 @@ def update_user_status(user_id: int, req: UserStatusReq, db: Session = Depends(g
     
     return {"status": "success", "message": "Estado de usuario actualizado", "is_active": bool(user.is_active)}
 
+def record_weight_history(db: Session, user_id: int, weight: str, routine_id: Optional[int] = None, notes: Optional[str] = None):
+    # Solo registrar si hay peso
+    if not weight:
+        return
+    
+    # Deduplicación: Si existe un registro idéntico en los últimos 2 minutos, lo aprovechamos
+    two_min_ago = datetime.now() - timedelta(minutes=2)
+    recent = db.query(models.WeightHistory).filter(
+        models.WeightHistory.user_id == user_id,
+        models.WeightHistory.created_at >= two_min_ago,
+        models.WeightHistory.weight == weight
+    ).order_by(models.WeightHistory.created_at.desc()).first()
+
+    if recent:
+        # Si recibimos datos de rutina, lo asociamos al registro existente
+        if routine_id:
+            recent.routine_id = routine_id
+        # Si el nuevo registro es de "Rutina" y el anterior era de "Perfil", actualizamos la nota
+        # Pero si el anterior era "Registro inicial", mantenemos esa nota que es más importante.
+        if notes and "Rutina" in notes and "inicial" not in (recent.notes or ""):
+            recent.notes = notes
+        db.commit()
+        return
+    
+    new_entry = models.WeightHistory(
+        user_id=user_id,
+        weight=weight,
+        routine_id=routine_id,
+        notes=notes
+    )
+    db.add(new_entry)
+    db.commit()
+
 @app.post("/api/coach/routines")
 def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
     client_user = db.query(models.User).filter(models.User.email == req.client_email).first()
@@ -235,6 +274,12 @@ def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session
     new_routine = models.Routine(user_id=client_user.id, routine_data=req.routine_data)
     db.add(new_routine)
     db.commit()
+    db.refresh(new_routine)
+
+    # Registrar peso en histórico asociado a esta rutina
+    prof = client_user.profile
+    if prof and prof.weight:
+        record_weight_history(db, client_user.id, prof.weight, routine_id=new_routine.id, notes="Actualización de Rutina")
 
     # Preparar datos analíticos para BigQuery
     prof = client_user.profile
@@ -289,6 +334,22 @@ def get_my_routine(db: Session = Depends(get_db), current_user: models.User = De
         "routine_data": routine.routine_data,
         "profile": profile_data
     }
+
+@app.get("/api/client/weight-history")
+def get_weight_history(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    history = db.query(models.WeightHistory)\
+        .filter(models.WeightHistory.user_id == current_user.id)\
+        .order_by(models.WeightHistory.created_at.desc())\
+        .all()
+    
+    return [
+        {
+            "id": h.id,
+            "weight": h.weight,
+            "date": h.created_at.strftime("%Y-%m-%d %H:%M"),
+            "notes": h.notes
+        } for h in history
+    ]
 
 @app.get("/")
 def read_root():

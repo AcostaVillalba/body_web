@@ -15,6 +15,7 @@ class User(Base):
 
     profile = relationship("ClientProfile", back_populates="user", uselist=False)
     routines = relationship("Routine", back_populates="user")
+    weight_history = relationship("WeightHistory", back_populates="user")
 
 class ClientProfile(Base):
     __tablename__ = "client_profiles"
@@ -43,3 +44,19 @@ class Routine(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     
     user = relationship("User", back_populates="routines")
+    weight_entries = relationship("WeightHistory", back_populates="routine")
+
+class WeightHistory(Base):
+    __tablename__ = "weight_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    routine_id = Column(Integer, ForeignKey("routines.id"), nullable=True)
+    
+    weight = Column(String)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    notes = Column(String, nullable=True) # e.g. "Actualización de rutina"
+
+    user = relationship("User", back_populates="weight_history")
+    routine = relationship("Routine", back_populates="weight_entries")
+
