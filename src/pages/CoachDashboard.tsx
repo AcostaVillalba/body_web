@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { EXERCISES_DB, getImageUrl } from '../data';
+import { EXERCISES_DB, getImageUrl, preloadImage } from '../data';
 import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft } from 'lucide-react';
 import '../App.css';
+import ExerciseImage from '../components/ExerciseImage';
 
 interface ExerciseSubRow {
   id: string;
@@ -392,7 +393,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
 
             <div className="header">
               <h1>BODY BY <span>J.A.</span></h1>
-              <p style={{ margin: '-10px 0 10px 0', fontSize: '14px', fontWeight: 700, color: '#c5a021', textTransform: 'uppercase' }}>BY JUAN CARLOS GONZALES</p>
+              <p style={{ margin: '-10px 0 10px 0', fontSize: '14px', fontWeight: 700, color: '#c5a021', textTransform: 'uppercase' }}>BY NAME COAH</p>
               <p>CONTROL PANEL | Coach: {user?.name}</p>
             </div>
           </>
@@ -727,8 +728,13 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
 
                     <div className="rows-holder">
                       {group.exercises.map((ex, idx) => (
-                        <div key={ex.id} className="exercise-sub-row">
+                        <div 
+                          key={ex.id} 
+                          className="exercise-sub-row"
+                          onMouseEnter={() => { if (ex.img) preloadImage(ex.img); }}
+                        >
                           <div className="field">
+
                             <label>{idx === 0 ? 'EJERCICIO' : 'EJERCICIO B'}</label>
                             <input
                               type="text"
@@ -809,7 +815,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, onCancel
 
                           <div className="img-preview-box">
                             {ex.img ? (
-                              <img src={ex.img} alt={ex.name} />
+                              <ExerciseImage src={ex.img} alt={ex.name} />
                             ) : (
                               <span>+ FOTO (Auto)</span>
                             )}
