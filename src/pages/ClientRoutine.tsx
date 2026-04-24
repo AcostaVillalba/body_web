@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { LogOut, ChevronDown, ChevronUp, History, X } from 'lucide-react';
 import logoBody2 from '../assets/logobody2.jpeg';
 import logoBody from '../assets/logobody.png'; // Watermark
-import { EXERCISES_DB } from '../data';
+import { EXERCISES_DB, preloadImage, getImageUrl } from '../data';
+import ExerciseImage from '../components/ExerciseImage';
 
 const ClientRoutine = () => {
     const { user, token, logout } = useAuth();
@@ -103,7 +104,7 @@ const ClientRoutine = () => {
                 </button>
                 <img src={logoBody2} alt="Logo" style={{ width: 120, borderRadius: 15, marginBottom: 15 }} />
                 <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, letterSpacing: '-1px' }}>BODY BY <span style={{ color: '#c5a021' }}>J.A.</span></h1>
-                <p style={{ margin: '2px 0 0 0', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', color: '#fff', textTransform: 'uppercase' }}>BY JUAN CARLOS GONZALES</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', color: '#fff', textTransform: 'uppercase' }}>BY NAME COAH</p>
                 <p style={{ margin: '10px 0 0 0', fontSize: '11px', fontWeight: 700, letterSpacing: '4px', color: '#c5a021', textTransform: 'uppercase' }}>PLAN DE ENTRENAMIENTO</p>
                 <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#ccc' }}>Hola, {user?.name}</p>
             </div>
@@ -162,7 +163,7 @@ const ClientRoutine = () => {
                                 }}>
                                     <h3 style={{ color: '#c5a021', fontSize: '24px', fontWeight: 900, marginBottom: '15px', textTransform: 'uppercase' }}>¡Hola, {user?.name}!</h3>
                                     <p style={{ fontSize: '15px', color: '#1a1a1a', lineHeight: '1.7', marginBottom: '30px', fontWeight: 500 }}>
-                                        <strong style={{ color: '#111', fontWeight: 900 }}>Soy Juan Carlos González, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida.
+                                        <strong style={{ color: '#111', fontWeight: 900 }}>Soy Name coah, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida.
                                     </p>
 
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '30px' }}>
@@ -337,7 +338,7 @@ const ClientRoutine = () => {
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     <div style={{ padding: '20px 25px', background: '#f1f5f9', textAlign: 'center' }}>
                                         <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
                                             Registrado automáticamente con cada actualización
@@ -458,44 +459,51 @@ const ClientRoutine = () => {
                                                         )}
                                                     </div>
 
-                                                    {group.exercises.map((ex: any, idx: number) => (
-                                                        <div key={ex.id} style={{ padding: '25px', borderBottom: idx < group.exercises.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                                                                <div>
-                                                                    {getMuscleGroup(ex.name) && (
-                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                                                                            <span style={{
-                                                                                fontSize: '12px', fontWeight: 800,
-                                                                                letterSpacing: '2px', textTransform: 'uppercase',
-                                                                                color: '#3394d4ff', background: '#e0f3f5ff',
-                                                                                border: '1px solid #81baedff',
-                                                                                padding: '3px 10px', borderRadius: 20,
-                                                                                lineHeight: 1.4
-                                                                            }}>
-                                                                                {getMuscleGroup(ex.name)}
-                                                                            </span>
+                                                    {group.exercises.map((ex: any, idx: number) => {
+                                                        const currentImgUrl = getImageUrl(ex.name) || '';
+                                                        return (
+                                                            <div
+                                                                key={ex.id}
+                                                                style={{ padding: '25px', borderBottom: idx < group.exercises.length - 1 ? '1px solid #e5e7eb' : 'none' }}
+                                                                onMouseEnter={() => { if (currentImgUrl) preloadImage(currentImgUrl); }}
+                                                            >
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                                                    <div>
+                                                                        {getMuscleGroup(ex.name) && (
+                                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                                                                                <span style={{
+                                                                                    fontSize: '12px', fontWeight: 800,
+                                                                                    letterSpacing: '2px', textTransform: 'uppercase',
+                                                                                    color: '#3394d4ff', background: '#e0f3f5ff',
+                                                                                    border: '1px solid #81baedff',
+                                                                                    padding: '3px 10px', borderRadius: 20,
+                                                                                    lineHeight: 1.4
+                                                                                }}>
+                                                                                    {getMuscleGroup(ex.name)}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                        <div style={{ fontWeight: 900, fontSize: '20px', color: '#111', marginBottom: 12, textTransform: 'uppercase', lineHeight: 1.2 }}>
+                                                                            {isBiserie ? (idx === 0 ? 'A. ' : 'B. ') : ''}{ex.name || 'Ejercicio'}
                                                                         </div>
-                                                                    )}
-                                                                    <div style={{ fontWeight: 900, fontSize: '20px', color: '#111', marginBottom: 12, textTransform: 'uppercase', lineHeight: 1.2 }}>
-                                                                        {isBiserie ? (idx === 0 ? 'A. ' : 'B. ') : ''}{ex.name || 'Ejercicio'}
+                                                                        <div style={{ display: 'inline-block', background: '#fdfaf0', border: '1px solid #f2e3b3', color: '#a38210', padding: '8px 16px', borderRadius: 30, fontWeight: 800, fontSize: '14px', marginBottom: 15 }}>
+                                                                            {ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series || '0'} Series x ${ex.reps || '0'} Reps`}
+                                                                        </div>
+                                                                        {ex.note && (
+                                                                            <div style={{ fontSize: '14px', color: '#444', background: '#f8f9fa', padding: 15, borderRadius: 10, borderLeft: '4px solid #c5a021', fontWeight: 500 }}>
+                                                                                {ex.note}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                    <div style={{ display: 'inline-block', background: '#fdfaf0', border: '1px solid #f2e3b3', color: '#a38210', padding: '8px 16px', borderRadius: 30, fontWeight: 800, fontSize: '14px', marginBottom: 15 }}>
-                                                                        {ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series || '0'} Series x ${ex.reps || '0'} Reps`}
-                                                                    </div>
-                                                                    {ex.note && (
-                                                                        <div style={{ fontSize: '14px', color: '#444', background: '#f8f9fa', padding: 15, borderRadius: 10, borderLeft: '4px solid #c5a021', fontWeight: 500 }}>
-                                                                            {ex.note}
+                                                                    {currentImgUrl && (
+                                                                        <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden', background: '#fafafa' }}>
+                                                                            <ExerciseImage src={currentImgUrl} alt={ex.name} />
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                {ex.img && (
-                                                                    <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden', background: '#fafafa' }}>
-                                                                        <img src={ex.img} alt={ex.name} style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }} />
-                                                                    </div>
-                                                                )}
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        )
+                                                    })}
                                                     <div style={{ background: '#71a5cb', color: '#fff', textAlign: 'center', padding: 15, fontWeight: 800, fontSize: '12px', letterSpacing: '1px' }}>
                                                         ⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE
                                                     </div>
@@ -537,12 +545,12 @@ const ClientRoutine = () => {
                         fontSize: '20px', fontWeight: 900, color: '#fff',
                         margin: '0 0 20px 0', letterSpacing: '0.5px'
                     }}>
-                        Juan Carlos González
+                        Name coah
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 28, flexWrap: 'wrap' }}>
                         {/* Instagram */}
                         <a
-                            href="https://www.instagram.com/juancarlosgc03_18"
+                            href="https://www.instagram.com/jefeandrea"
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
@@ -568,11 +576,11 @@ const ClientRoutine = () => {
                                 <circle cx="12" cy="12" r="4" stroke="#c5a021" strokeWidth="2" />
                                 <circle cx="17.5" cy="6.5" r="1.2" fill="#c5a021" />
                             </svg>
-                            @juancarlosgc03_18
+                            @jefeandrea
                         </a>
                         {/* Phone */}
                         <a
-                            href="tel:+573013806239"
+                            href="tel:+571234567890"
                             style={{
                                 display: 'flex', alignItems: 'center', gap: 10,
                                 color: '#c5a021', textDecoration: 'none',
@@ -594,7 +602,7 @@ const ClientRoutine = () => {
                             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M6.6 10.8C7.8 13.2 9.8 15.2 12.2 16.4L14 14.6C14.3 14.3 14.7 14.2 15 14.4C16.1 14.8 17.3 15 18.5 15C19.3 15 20 15.7 20 16.5V19.5C20 20.3 19.3 21 18.5 21C9.9 21 3 14.1 3 5.5C3 4.7 3.7 4 4.5 4H7.5C8.3 4 9 4.7 9 5.5C9 6.7 9.2 7.9 9.6 9C9.7 9.3 9.6 9.7 9.4 10L6.6 10.8Z" stroke="#c5a021" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
-                            +57 301 3806239
+                            +57 1234567890
                         </a>
                     </div>
                 </div>
