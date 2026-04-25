@@ -94,6 +94,12 @@ const AdminDashboard = () => {
     try {
       const res = await fetch('http://localhost:8000/api/coach/clients', { headers: authHeaders });
 
+      if (res.status === 401) {
+        // Sesión inválida o expirada — limpiar y redirigir al login
+        logout();
+        return;
+      }
+
       if (res.status === 403) {
         const data = await res.json();
         if (data.detail && String(data.detail).toLowerCase().includes("plan ha expirado")) {

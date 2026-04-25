@@ -2,15 +2,15 @@ from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 import os
 import time
 from google.cloud import bigquery
 from google.oauth2 import service_account
 from sqlalchemy.orm import Session
 
-BOGOTA_TZ = ZoneInfo("America/Bogota")
+# Colombia = UTC-5 (sin horario de verano)
+BOGOTA_TZ = timezone(timedelta(hours=-5))
 
 def now_bogota() -> datetime:
     """Retorna la fecha/hora actual en zona horaria de Colombia (UTC-5)."""

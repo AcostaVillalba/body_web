@@ -1,11 +1,10 @@
 import os
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 import models
 
-BOGOTA_TZ = ZoneInfo("America/Bogota")
+BOGOTA_TZ = timezone(timedelta(hours=-5))
 
 def now_bogota() -> datetime:
     """Retorna la fecha/hora actual en zona horaria de Colombia (UTC-5)."""
