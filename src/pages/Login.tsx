@@ -27,8 +27,11 @@ const Login = () => {
       }
 
       const data = await res.json();
-      
-      if (data.is_active === false) {
+      console.log("Login response:", data);
+
+      // El bloqueo por inactividad solo debe aplicar a Clientes. 
+      // Los Coaches y Admins deben poder entrar siempre.
+      if (data.role === 'Client' && data.is_active === false) {
         throw new Error("Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso.");
       }
 
@@ -53,10 +56,13 @@ const Login = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#000000ff', color: '#fff' }}>
-      <img src={logoBody2} alt="BODY BY JA" style={{ width: 180, borderRadius: 20, marginBottom: 30 }} />
+      <img src={logoBody2} alt="BODY LOGIC" style={{ width: 180, borderRadius: 20, marginBottom: 30 }} />
       <h1 className="brand-logo" style={{ color: '#fff', fontSize: '3rem', margin: 0 }}>
-        BODY BY <span style={{ color: '#c5a021' }}>J.A.</span>
+        BODY <span style={{ color: '#c5a021' }}>LOGIC</span>
       </h1>
+      <p style={{ letterSpacing: '2px', textTransform: 'uppercase', fontSize: '11px', color: '#888', marginBottom: 4, fontWeight: 600 }}>
+        Resultados diseñados a tu medida
+      </p>
       <p style={{ letterSpacing: '4px', textTransform: 'uppercase', fontSize: '12px', color: '#c5a021', marginBottom: 50, fontWeight: 800 }}>
         Control de Acceso
       </p>
@@ -74,10 +80,7 @@ const Login = () => {
         boxShadow: '0 4px 24px rgba(197,160,33,0.12)'
       }}>
         <p style={{ fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: '#c5a021', fontWeight: 800, margin: '0 0 10px 0' }}>
-          Tu Coach
-        </p>
-        <p style={{ fontSize: '18px', fontWeight: 700, color: '#f0f0f0', margin: '0 0 16px 0', letterSpacing: '0.5px' }}>
-          Name coah
+          Comunícate con nosotros
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
           {/* Instagram */}
@@ -142,7 +145,7 @@ const Login = () => {
       </div>
 
       <p style={{ marginTop: 50, color: '#666', fontSize: '12px' }}>
-        © {new Date().getFullYear()} Body by J.A. Todos los derechos reservados.
+        © {new Date().getFullYear()} Body Logic. Todos los derechos reservados.
       </p>
     </div>
   );

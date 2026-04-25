@@ -12,6 +12,7 @@ class User(Base):
     role = Column(String, default="Client") # "Admin", "Coach", "Client"
     google_id = Column(String, unique=True, nullable=True)
     is_active = Column(Boolean, default=True)
+    coach_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     profile = relationship("ClientProfile", back_populates="user", uselist=False)
     routines = relationship("Routine", back_populates="user")

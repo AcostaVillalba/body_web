@@ -10,7 +10,7 @@ from database import get_db
 import models
 
 # In a real app, you would load these from a .env file
-SECRET_KEY = os.getenv("SECRET_KEY", "SUPER_SECRET_BODYBYJA_KEY_CHANGE_ME")
+SECRET_KEY = os.getenv("SECRET_KEY", "SUPER_SECRET_BODYLOGIC_KEY_CHANGE_ME")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
@@ -64,7 +64,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if user is None:
         raise credentials_exception
     
-    if not user.is_active:
+    # El bloqueo de "plan expirado" solo aplica a Clientes. 
+    # Admins y Coaches siempre deben poder entrar.
+    if user.role == "Client" and not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso."
@@ -74,5 +76,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 
 async def get_current_active_coach(current_user: models.User = Depends(get_current_user)):
     if current_user.role not in ["Coach", "Admin"]:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    return current_user
+
+async def get_current_active_admin(current_user: models.User = Depends(get_current_user)):
+    if current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     return current_user

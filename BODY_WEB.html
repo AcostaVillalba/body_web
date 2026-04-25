@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BODY BY J.A. - Elite Coach Panel</title>
+    <title>BODY LOGIC - Elite Coach Panel</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -230,8 +230,9 @@
 
     <div class="admin-container">
         <div class="header">
-            <h1>BODY BY <span>J.A.</span></h1>
+            <h1>BODY LOGIC</h1>
             <p>CONTROL PANEL | JUAN CARLOS GONZÁLEZ</p>
+            <p style="font-size: 12px; color: #c5a021; margin-top: -10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Resultados diseñados a tu medida</p>
         </div>
 
         <!-- DATOS ATLETA -->
@@ -460,7 +461,7 @@
 <body>
     <div class="wrapper">
         <div class="top-banner">
-            <h1 style="margin:0; font-size:45px; font-weight:900;">BODY BY <span style="color:#c5a021">J.A.</span></h1>
+            <h1 style="margin:0; font-size:45px; font-weight:900;">BODY <span style="color:#c5a021">LOGIC</span></h1>
             <p style="margin:0; font-size:12px; font-weight:700; letter-spacing:2px;">BY JUAN CARLOS GONZÁLEZ</p>
         </div>
 
@@ -504,7 +505,7 @@
             const blob = new Blob([finalTemplate], { type: 'text/html' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `Plan_BODYBYJA_${athlete.name.replace(/ /g, '_')}.html`;
+            a.download = `Plan_BODYLOGIC_${athlete.name.replace(/ /g, '_')}.html`;
             a.click();
         }
     </script>

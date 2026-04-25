@@ -6,8 +6,10 @@ import '../App.css';
 
 const AdminDashboard = () => {
   const { token, logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'create'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'create' | 'coaches'>('users');
   const [clients, setClients] = useState<any[]>([]);
+  const [coachesList, setCoachesList] = useState<any[]>([]); // Para la pestaña de gestión
+  const [newCoach, setNewCoach] = useState({ name: '', email: '' });
   const [editingClientEmail, setEditingClientEmail] = useState<string | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<RoutineDay[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,8 +19,10 @@ const AdminDashboard = () => {
     status: 'all',
     planType: 'all',
     dateType: 'end', // 'start' o 'end'
-    dateSort: 'desc'
+    dateSort: 'desc',
+    coachId: 'all'
   });
+  const [coaches, setCoaches] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
 
@@ -41,6 +45,50 @@ const AdminDashboard = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filters]);
+
+  useEffect(() => {
+    fetchCoaches();
+  }, []);
+
+  const fetchCoaches = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/coach/list', { headers: authHeaders });
+      if (res.ok) setCoaches(await res.json());
+      
+      const resAdmin = await fetch('http://localhost:8000/api/admin/coaches', { headers: authHeaders });
+      if (resAdmin.ok) setCoachesList(await resAdmin.json());
+    } catch (e) { console.error("Error fetching coaches", e); }
+  };
+
+  const handleCreateCoach = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/coaches', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(newCoach)
+      });
+      if (res.ok) {
+        setNewCoach({ name: '', email: '' });
+        fetchCoaches();
+        alert("Coach registrado correctamente");
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Error al registrar coach");
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeleteCoach = async (id: number) => {
+    if (!confirm("¿Estás seguro de remover a este coach? Se convertirá en cliente regular.")) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/admin/coaches/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+      if (res.ok) fetchCoaches();
+    } catch (e) { console.error(e); }
+  };
 
   const fetchClients = async () => {
     try {
@@ -100,7 +148,8 @@ const AdminDashboard = () => {
         body: JSON.stringify({
           email: editingProfile.email,
           name: editingProfile.name,
-          profile: editingProfile.profile || { age: '', weight: '', goal: '', planType: '', startDate: '', controlDate: '' }
+          profile: editingProfile.profile || { age: '', weight: '', goal: '', planType: '', startDate: '', controlDate: '' },
+          coach_id: editingProfile.coach_id
         })
       });
       const data = await res.json();
@@ -146,7 +195,7 @@ const AdminDashboard = () => {
       <div style={{ background: '#111', padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900, letterSpacing: '-0.5px' }}>
-            BODY BY <span style={{ color: '#c5a021' }}>J.A.</span>
+            BODY <span style={{ color: '#c5a021' }}>LOGIC</span>
           </h1>
           <p style={{ margin: 0, fontSize: '11px', color: '#888', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: 800 }}>
             ADMINISTRATOR PANEL
@@ -183,6 +232,15 @@ const AdminDashboard = () => {
             }}>
             <PlusCircle size={18} /> CREAR RUTINA
           </button>
+          <button
+            onClick={() => setActiveTab('coaches')}
+            style={{
+              flex: 1, padding: '16px', background: activeTab === 'coaches' ? '#571665ff' : '#fff', color: activeTab === 'coaches' ? '#fff' : '#111',
+              border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              boxShadow: activeTab === 'coaches' ? '0 8px 16px rgba(87,22,101,0.3)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+            }}>
+            <Shield size={18} /> GESTIÓN DE COACHES
+          </button>
         </div>
 
         {/* Content */}
@@ -193,12 +251,14 @@ const AdminDashboard = () => {
             const filteredClients = clients.filter(c => {
               const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 c.email.toLowerCase().includes(searchQuery.toLowerCase());
-              const matchesStatus = filters.status === 'all' ||
-                (filters.status === 'active' ? c.is_active : !c.is_active);
               const matchesPlan = filters.planType === 'all' ||
                 (c.profile?.planType === filters.planType);
-
-              return matchesSearch && matchesStatus && matchesPlan;
+              const matchesCoach = filters.coachId === 'all' ||
+                (String(c.coach_id) === String(filters.coachId));
+              const matchesStatus = filters.status === 'all' || 
+                (filters.status === 'active' ? c.is_active : !c.is_active);
+              
+              return matchesSearch && matchesStatus && matchesPlan && matchesCoach;
             }).sort((a, b) => {
               const field = filters.dateType === 'start' ? 'startDate' : 'endDate';
               const dateA = a.profile?.[field] ? new Date(a.profile[field]).getTime() : 0;
@@ -255,7 +315,7 @@ const AdminDashboard = () => {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                             <span style={{ fontSize: 13, fontWeight: 800, color: '#111' }}>OPCIONES DE FILTRO</span>
                             <button
-                              onClick={() => setFilters({ status: 'all', planType: 'all', dateType: 'end', dateSort: 'desc' })}
+                              onClick={() => setFilters({ status: 'all', planType: 'all', dateType: 'end', dateSort: 'desc', coachId: 'all' })}
                               style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
                               <RotateCcw size={12} /> Limpiar
                             </button>
@@ -341,7 +401,8 @@ const AdminDashboard = () => {
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Email</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Plan / Objetivo</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Inicio del Plan</th>
-                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
+                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>Coach</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Estado de Acceso</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
                       </tr>
@@ -394,6 +455,11 @@ const AdminDashboard = () => {
                             ) : (
                               <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>—</span>
                             )}
+                          </td>
+                          <td style={{ padding: '20px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#c5a021', textTransform: 'uppercase' }}>
+                              {coaches.find(co => String(co.id) === String(c.coach_id))?.name || 'Sin asignar'}
+                            </div>
                           </td>
                           <td style={{ padding: '20px' }}>
                             <button
@@ -524,6 +590,7 @@ const AdminDashboard = () => {
               ) : (
                 <CoachDashboard
                   hideHeader={true}
+                  hideTabs={true}
                   preloadedEmail={editingClientEmail}
                   preloadedRoutine={editingRoutine || []}
                   onCancel={() => setEditingClientEmail(null)}
@@ -536,6 +603,79 @@ const AdminDashboard = () => {
           {activeTab === 'create' && (
             <div style={{ padding: '0' }}>
               <CoachDashboard hideHeader={true} />
+            </div>
+          )}
+
+          {/* TAB 3: COACH MANAGEMENT */}
+          {activeTab === 'coaches' && (
+            <div style={{ padding: 40 }}>
+              <div style={{ display: 'flex', gap: 40 }}>
+                {/* Formulario Izquierda */}
+                <div style={{ flex: '0 0 350px' }}>
+                  <div className="section-title" style={{ marginTop: 0 }}>Registrar Nuevo Coach</div>
+                  <form onSubmit={handleCreateCoach} style={{ background: '#f8fafc', padding: 25, borderRadius: 16, border: '2px solid #e2e8f0' }}>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>NOMBRE COMPLETO</label>
+                      <input 
+                        required 
+                        placeholder="Ej: Juan Pérez"
+                        value={newCoach.name} 
+                        onChange={e => setNewCoach({...newCoach, name: e.target.value})}
+                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }} 
+                      />
+                    </div>
+                    <div style={{ marginBottom: 20 }}>
+                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>CORREO GMAIL</label>
+                      <input 
+                        required 
+                        type="email"
+                        placeholder="ejemplo@gmail.com"
+                        value={newCoach.email} 
+                        onChange={e => setNewCoach({...newCoach, email: e.target.value})}
+                        style={{ width: '100%', padding: '12px', border: '1px solid #c5a021', borderRadius: 8, outline: 'none' }} 
+                      />
+                    </div>
+                    <button style={{ width: '100%', background: '#111', color: '#fff', padding: '14px', borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <PlusCircle size={18} /> AGREGAR COACH
+                    </button>
+                  </form>
+                </div>
+
+                {/* Tabla Derecha */}
+                <div style={{ flex: 1 }}>
+                  <div className="section-title" style={{ marginTop: 0 }}>Coaches Activos</div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '11px', textTransform: 'uppercase' }}>
+                          <th style={{ padding: '15px 20px', fontWeight: 800 }}>Nombre</th>
+                          <th style={{ padding: '15px 20px', fontWeight: 800 }}>Email</th>
+                          <th style={{ padding: '15px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {coachesList.map(c => (
+                          <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '15px 20px', fontWeight: 700 }}>{c.name}</td>
+                            <td style={{ padding: '15px 20px', color: '#64748b' }}>{c.email}</td>
+                            <td style={{ padding: '15px 20px', textAlign: 'right' }}>
+                              <button 
+                                onClick={() => handleDeleteCoach(c.id)}
+                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
+                              >
+                                Eliminar
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {coachesList.length === 0 && (
+                          <tr><td colSpan={3} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No hay coaches registrados.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -588,6 +728,19 @@ const AdminDashboard = () => {
                     <option value="Anual">Anual</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>ASIGNAR COACH</label>
+                <select 
+                  value={editingProfile.coach_id || ''} 
+                  onChange={e => setEditingProfile({ ...editingProfile, coach_id: e.target.value ? parseInt(e.target.value) : null })} 
+                  style={{ width: '100%', padding: '10px 12px', border: '2px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
+                >
+                  <option value="">-- Sin asignar --</option>
+                  {coaches.map(co => (
+                    <option key={co.id} value={co.id}>{co.name}</option>
+                  ))}
+                </select>
               </div>
               <button disabled={statusMsg.text === 'Guardando...'} style={{ background: '#111', color: '#fff', padding: 12, borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 <Save size={16} /> GUARDAR CAMBIOS
