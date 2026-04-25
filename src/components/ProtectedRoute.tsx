@@ -15,7 +15,8 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   }
 
   // Logica de Soft Delete: Si el usuario es desactivado mientras navega, lo sacamos
-  if (user && (user.isActive === false || String(user.isActive) === "0")) {
+  // EXCEPCIÓN: Admins y Coaches siempre pueden navegar
+  if (user && user.role === 'Client' && (user.isActive === false || String(user.isActive) === "0")) {
     logout();
     return <Navigate to="/login" replace />;
   }

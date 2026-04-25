@@ -1,5 +1,5 @@
-# body_web
-BODY BY J.A. Planes de entrenamiento personalizado
+# BODY LOGIC
+BODY LOGIC Planes de entrenamiento personalizado
 
 # React + TypeScript + Vite
 

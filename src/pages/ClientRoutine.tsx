@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, ChevronDown, ChevronUp, History, X } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronUp, History, X, Bell } from 'lucide-react';
 import logoBody2 from '../assets/logobody2.jpeg';
 import logoBody from '../assets/logobody.png'; // Watermark
 import { EXERCISES_DB, preloadImage, getImageUrl } from '../data';
@@ -13,10 +13,12 @@ const ClientRoutine = () => {
     const [loading, setLoading] = useState(true);
     const [openDay, setOpenDay] = useState<string | null>(null);
     const [showRecommendations, setShowRecommendations] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const [showCoachInfo, setShowCoachInfo] = useState(false);
     const [showWeightHistory, setShowWeightHistory] = useState(false);
     const [weightHistory, setWeightHistory] = useState<any[]>([]);
+    const [coachName, setCoachName] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchRoutine = async () => {
@@ -40,6 +42,9 @@ const ClientRoutine = () => {
                     }
                     if (data.profile) {
                         setProfile(data.profile);
+                    }
+                    if (data.coach_name) {
+                        setCoachName(data.coach_name);
                     }
                 }
             } catch (err) {
@@ -102,10 +107,72 @@ const ClientRoutine = () => {
                 <button onClick={logout} style={{ position: 'absolute', top: 15, right: 15, background: 'transparent', border: 'none', color: '#c5a021', cursor: 'pointer' }}>
                     <LogOut size={24} />
                 </button>
+
+                {/* Notification Bell */}
+                <div style={{ position: 'absolute', top: 15, right: 60 }}>
+                    <button 
+                        onClick={() => setShowNotifications(!showNotifications)} 
+                        style={{ background: 'transparent', border: 'none', color: '#c5a021', cursor: 'pointer', position: 'relative' }}
+                    >
+                        <Bell size={24} />
+                        {profile?.endDate && (() => {
+                            const today = new Date();
+                            const end = new Date(profile.endDate);
+                            const diffDays = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            if (diffDays >= 0 && diffDays <= 3) {
+                                return (
+                                    <span style={{ 
+                                        position: 'absolute', top: -5, right: -5, 
+                                        background: '#ef4444', color: '#fff', 
+                                        borderRadius: '50%', width: 18, height: 18, 
+                                        fontSize: '10px', display: 'flex', 
+                                        alignItems: 'center', justifyContent: 'center',
+                                        fontWeight: 900, border: '2px solid #000'
+                                    }}>
+                                        1
+                                    </span>
+                                );
+                            }
+                            return null;
+                        })()}
+                    </button>
+
+                    {/* Notifications Dropdown */}
+                    {showNotifications && (
+                        <div style={{
+                            position: 'absolute', top: 35, right: 0,
+                            background: '#1a1a1a', border: '1px solid #c5a021',
+                            borderRadius: '12px', width: '280px', padding: '15px',
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)', zIndex: 1000,
+                            textAlign: 'left'
+                        }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#c5a021', borderBottom: '1px solid #333', paddingBottom: '8px' }}>Notificaciones</h4>
+                            
+                            {profile?.endDate && (() => {
+                                const today = new Date();
+                                const end = new Date(profile.endDate);
+                                const diffTime = end.getTime() - today.getTime();
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                
+                                if (diffDays >= 0 && diffDays <= 3) {
+                                    return (
+                                        <div style={{ background: '#2d1a10', borderLeft: '3px solid #fb923c', padding: '10px', borderRadius: '4px' }}>
+                                            <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#fb923c' }}>⚠️ Vencimiento de Plan</p>
+                                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#ccc' }}>
+                                                Tu plan expira {diffDays === 0 ? 'HOY' : `en ${diffDays} días`}. Por favor, contacta a tu coach para renovar.
+                                            </p>
+                                        </div>
+                                    );
+                                }
+                                return <p style={{ margin: 0, fontSize: '12px', color: '#666', textAlign: 'center', padding: '10px 0' }}>No tienes notificaciones pendientes.</p>;
+                            })()}
+                        </div>
+                    )}
+                </div>
                 <img src={logoBody2} alt="Logo" style={{ width: 120, borderRadius: 15, marginBottom: 15 }} />
-                <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, letterSpacing: '-1px' }}>BODY BY <span style={{ color: '#c5a021' }}>J.A.</span></h1>
-                <p style={{ margin: '2px 0 0 0', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', color: '#fff', textTransform: 'uppercase' }}>BY NAME COAH</p>
-                <p style={{ margin: '10px 0 0 0', fontSize: '11px', fontWeight: 700, letterSpacing: '4px', color: '#c5a021', textTransform: 'uppercase' }}>PLAN DE ENTRENAMIENTO</p>
+                <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, letterSpacing: '-1px' }}>BODY <span style={{ color: '#c5a021' }}>LOGIC</span></h1>
+                <p style={{ margin: '2px 0 0 0', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', color: '#fff', textTransform: 'uppercase' }}>Resultados diseñados a tu medida</p>
+                <p style={{ margin: '10px 0 0 0', fontSize: '11px', fontWeight: 700, letterSpacing: '4px', color: '#c5a021', textTransform: 'uppercase' }}>PLAN DE ENTRENAMIENTO PERSONALIZADO</p>
                 <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#ccc' }}>Hola, {user?.name}</p>
             </div>
 
@@ -146,7 +213,7 @@ const ClientRoutine = () => {
                                     letterSpacing: '1px'
                                 }}
                             >
-                                👔 Tu Coach Juan C. González
+                                👔 Tu Coach {coachName || '—'}
                                 {showCoachInfo ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                             </button>
 
@@ -163,7 +230,7 @@ const ClientRoutine = () => {
                                 }}>
                                     <h3 style={{ color: '#c5a021', fontSize: '24px', fontWeight: 900, marginBottom: '15px', textTransform: 'uppercase' }}>¡Hola, {user?.name}!</h3>
                                     <p style={{ fontSize: '15px', color: '#1a1a1a', lineHeight: '1.7', marginBottom: '30px', fontWeight: 500 }}>
-                                        <strong style={{ color: '#111', fontWeight: 900 }}>Soy Name coah, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida.
+                                        <strong style={{ color: '#111', fontWeight: 900 }}>Soy {coachName || 'tu coach'}, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida.
                                     </p>
 
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '30px' }}>
@@ -183,8 +250,6 @@ const ClientRoutine = () => {
                                 </div>
                             )}
                         </div>
-
-                        <h2 style={{ fontSize: '1.2rem', fontWeight: 900, textTransform: 'uppercase', marginBottom: 20, color: '#111' }}>Tu Semana de Entrenamiento</h2>
 
                         {/* Athlete Data Panel - Gold Version */}
                         {profile && (
@@ -421,6 +486,9 @@ const ClientRoutine = () => {
                             )}
                         </div>
 
+
+                        <h2 style={{ fontSize: '1.2rem', fontWeight: 900, textTransform: 'uppercase', margin: '25px 0 15px 0', color: '#111', textAlign: 'center' }}>Tu Semana de Entrenamiento</h2>
+
                         {routineDays.map((day) => (
                             <div key={day.name} style={{ marginBottom: 15 }}>
                                 {/* Accordion Header */}
@@ -545,7 +613,7 @@ const ClientRoutine = () => {
                         fontSize: '20px', fontWeight: 900, color: '#fff',
                         margin: '0 0 20px 0', letterSpacing: '0.5px'
                     }}>
-                        Name coah
+                        {coachName || '—'}
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 28, flexWrap: 'wrap' }}>
                         {/* Instagram */}
