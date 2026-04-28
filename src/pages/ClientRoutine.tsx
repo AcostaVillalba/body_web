@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, ChevronDown, ChevronUp, History, X, Bell } from 'lucide-react';
-import logoBody2 from '../assets/logobody2.jpeg';
-import logoBody from '../assets/logobody.png'; // Watermark
+import logoBody2 from '../assets/logobody2.png';
 import { EXERCISES_DB, preloadImage, getImageUrl } from '../data';
 import ExerciseImage from '../components/ExerciseImage';
 
@@ -18,6 +17,7 @@ const ClientRoutine = () => {
     const [showCoachInfo, setShowCoachInfo] = useState(false);
     const [showWeightHistory, setShowWeightHistory] = useState(false);
     const [weightHistory, setWeightHistory] = useState<any[]>([]);
+    const [notifications, setNotifications] = useState<any[]>([]);
     const [coachName, setCoachName] = useState<string | null>(null);
 
     useEffect(() => {
@@ -76,6 +76,44 @@ const ClientRoutine = () => {
         if (token) fetchHistory();
     }, [token, showWeightHistory]);
 
+    useEffect(() => {
+        const fetchNotifs = async () => {
+            if (!token) return;
+            try {
+                const res = await fetch('http://localhost:8000/api/notifications', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setNotifications(data);
+                }
+            } catch (err) {
+                console.error("Failed to load notifications");
+            }
+        };
+
+        if (token) {
+            fetchNotifs();
+            // Poll every 5 minutes
+            const interval = setInterval(fetchNotifs, 5 * 60 * 1000);
+            return () => clearInterval(interval);
+        }
+    }, [token]);
+
+    const deleteNotif = async (id: number) => {
+        try {
+            const res = await fetch(`http://localhost:8000/api/notifications/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setNotifications(prev => prev.filter(n => n.id !== id));
+            }
+        } catch (err) {
+            console.error("Failed to delete notification");
+        }
+    };
+
     const getDayAbbr = (dayName: string) => {
         const dayMap: { [key: string]: string } = {
             "Lunes": "LUN", "Martes": "MAR", "Miércoles": "MIÉ", "Jueves": "JUE", "Viernes": "VIE", "Sábado": "SÁB", "Domingo": "DOM"
@@ -103,76 +141,140 @@ const ClientRoutine = () => {
         <div style={{ fontFamily: "'Montserrat', sans-serif", background: '#f1f5f9', color: '#111', minHeight: '100vh', padding: '0 0 50px 0', position: 'relative' }}>
 
             {/* Cabecera Negra (del PDF original) */}
-            <div style={{ background: '#000', color: '#fff', padding: '40px 20px', textAlign: 'center', position: 'relative', borderBottom: '6px solid #c5a021' }}>
-                <button onClick={logout} style={{ position: 'absolute', top: 15, right: 15, background: 'transparent', border: 'none', color: '#c5a021', cursor: 'pointer' }}>
+            <div style={{ background: '#2d4739', color: '#fff', padding: '40px 20px', textAlign: 'center', position: 'relative', borderBottom: '6px solid #a2d149' }}>
+                <button onClick={logout} style={{ position: 'absolute', top: 15, right: 15, background: 'transparent', border: 'none', color: '#a2d149', cursor: 'pointer' }}>
                     <LogOut size={24} />
                 </button>
 
                 {/* Notification Bell */}
                 <div style={{ position: 'absolute', top: 15, right: 60 }}>
-                    <button 
-                        onClick={() => setShowNotifications(!showNotifications)} 
-                        style={{ background: 'transparent', border: 'none', color: '#c5a021', cursor: 'pointer', position: 'relative' }}
+                    <button
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        style={{ background: 'transparent', border: 'none', color: '#a2d149', cursor: 'pointer', position: 'relative' }}
                     >
                         <Bell size={24} />
-                        {profile?.endDate && (() => {
+                        {(notifications.length > 0 || (() => {
                             const today = new Date();
-                            const end = new Date(profile.endDate);
-                            const diffDays = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                            if (diffDays >= 0 && diffDays <= 3) {
-                                return (
-                                    <span style={{ 
-                                        position: 'absolute', top: -5, right: -5, 
-                                        background: '#ef4444', color: '#fff', 
-                                        borderRadius: '50%', width: 18, height: 18, 
-                                        fontSize: '10px', display: 'flex', 
-                                        alignItems: 'center', justifyContent: 'center',
-                                        fontWeight: 900, border: '2px solid #000'
-                                    }}>
-                                        1
-                                    </span>
-                                );
-                            }
-                            return null;
-                        })()}
+                            const end = new Date(profile?.endDate || '');
+                            const diffDaysEnd = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                            const control = new Date(profile?.controlDate || '');
+                            const diffDaysControl = Math.ceil((control.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                            return (diffDaysEnd >= 0 && diffDaysEnd <= 3) || (diffDaysControl === 1);
+                        })()) && (
+                                <span style={{
+                                    position: 'absolute', top: -5, right: -5,
+                                    background: '#ef4444', color: '#fff',
+                                    borderRadius: '50%', width: 18, height: 18,
+                                    fontSize: '10px', display: 'flex',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    fontWeight: 900, border: '2px solid #2d4739'
+                                }}>
+                                    {notifications.length + (profile ? (() => {
+                                        const today = new Date();
+                                        let count = 0;
+
+                                        const end = new Date(profile.endDate);
+                                        const diffDaysEnd = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                        if (diffDaysEnd >= 0 && diffDaysEnd <= 3) count++;
+
+                                        const control = new Date(profile.controlDate);
+                                        const diffDaysControl = Math.ceil((control.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                        if (diffDaysControl === 1) count++;
+
+                                        return count;
+                                    })() : 0)}
+                                </span>
+                            )}
                     </button>
 
                     {/* Notifications Dropdown */}
                     {showNotifications && (
                         <div style={{
                             position: 'absolute', top: 35, right: 0,
-                            background: '#1a1a1a', border: '1px solid #c5a021',
+                            background: '#1b3022', border: '1px solid #a2d149',
                             borderRadius: '12px', width: '280px', padding: '15px',
                             boxShadow: '0 10px 25px rgba(0,0,0,0.5)', zIndex: 1000,
                             textAlign: 'left'
                         }}>
-                            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#c5a021', borderBottom: '1px solid #333', paddingBottom: '8px' }}>Notificaciones</h4>
-                            
-                            {profile?.endDate && (() => {
-                                const today = new Date();
-                                const end = new Date(profile.endDate);
-                                const diffTime = end.getTime() - today.getTime();
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                
-                                if (diffDays >= 0 && diffDays <= 3) {
-                                    return (
-                                        <div style={{ background: '#2d1a10', borderLeft: '3px solid #fb923c', padding: '10px', borderRadius: '4px' }}>
-                                            <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#fb923c' }}>⚠️ Vencimiento de Plan</p>
-                                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#ccc' }}>
-                                                Tu plan expira {diffDays === 0 ? 'HOY' : `en ${diffDays} días`}. Por favor, contacta a tu coach para renovar.
-                                            </p>
-                                        </div>
-                                    );
-                                }
-                                return <p style={{ margin: 0, fontSize: '12px', color: '#666', textAlign: 'center', padding: '10px 0' }}>No tienes notificaciones pendientes.</p>;
-                            })()}
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#a2d149', borderBottom: '1px solid #333', paddingBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                                Notificaciones
+                                {notifications.length > 0 && <span style={{ fontSize: '10px', color: '#888', fontWeight: 400 }}>Toca para borrar</span>}
+                            </h4>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                                {notifications.map(n => (
+                                    <div
+                                        key={n.id}
+                                        onClick={() => deleteNotif(n.id)}
+                                        style={{ background: '#2d4739', padding: '10px', borderRadius: '8px', borderLeft: '3px solid #a2d149', cursor: 'pointer', transition: 'opacity 0.2s' }}
+                                        onMouseOver={e => e.currentTarget.style.opacity = '0.7'}
+                                        onMouseOut={e => e.currentTarget.style.opacity = '1'}
+                                    >
+                                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#fff' }}>Rutina Actualizada</p>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#ccc' }}>{n.message}</p>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '10px', color: '#a2d149', textAlign: 'right' }}>{n.date}</p>
+                                    </div>
+                                ))}
+
+                                {profile?.endDate && (() => {
+                                    const today = new Date();
+                                    const end = new Date(profile.endDate);
+                                    const diffTime = end.getTime() - today.getTime();
+                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                                    if (diffDays >= 0 && diffDays <= 3) {
+                                        return (
+                                            <div style={{ background: '#2d1a10', borderLeft: '3px solid #fb923c', padding: '10px', borderRadius: '4px' }}>
+                                                <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#fb923c' }}>⚠️ Vencimiento de Plan</p>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#ccc' }}>
+                                                    Tu plan expira {diffDays === 0 ? 'HOY' : `en ${diffDays} días`}. Por favor, contacta a tu coach para renovar.
+                                                </p>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+
+                                {profile?.controlDate && (() => {
+                                    const today = new Date();
+                                    const control = new Date(profile.controlDate);
+                                    const diffDays = Math.ceil((control.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                                    if (diffDays === 1) {
+                                        return (
+                                            <div style={{ background: '#eff6ff', borderLeft: '3px solid #3b82f6', padding: '10px', borderRadius: '4px' }}>
+                                                <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#1d4ed8' }}>📅 Recordatorio de Control</p>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#1e40af' }}>
+                                                    Mañana es tu día de control. ¡Prepárate para registrar tus progresos!
+                                                </p>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+
+                                {notifications.length === 0 && (!profile || (() => {
+                                    const today = new Date();
+                                    const end = new Date(profile.endDate);
+                                    const diffDaysEnd = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                                    const control = new Date(profile.controlDate);
+                                    const diffDaysControl = Math.ceil((control.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                                    return (diffDaysEnd < 0 || diffDaysEnd > 3) && (diffDaysControl !== 1);
+                                })()) && (
+                                        <p style={{ margin: 0, fontSize: '12px', color: '#666', textAlign: 'center', padding: '10px 0' }}>No tienes notificaciones pendientes.</p>
+                                    )}
+                            </div>
                         </div>
                     )}
                 </div>
-                <img src={logoBody2} alt="Logo" style={{ width: 120, borderRadius: 15, marginBottom: 15 }} />
-                <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, letterSpacing: '-1px' }}>BODY <span style={{ color: '#c5a021' }}>LOGIC</span></h1>
+                <img src={logoBody2} alt="Logo" style={{ width: 150, borderRadius: 15, marginBottom: 15, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' }} />
+                <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, letterSpacing: '-1px' }}>BODY <span style={{ color: '#a2d149' }}>LOGIC</span></h1>
                 <p style={{ margin: '2px 0 0 0', fontSize: '13px', fontWeight: 700, letterSpacing: '1px', color: '#fff', textTransform: 'uppercase' }}>Resultados diseñados a tu medida</p>
-                <p style={{ margin: '10px 0 0 0', fontSize: '11px', fontWeight: 700, letterSpacing: '4px', color: '#c5a021', textTransform: 'uppercase' }}>PLAN DE ENTRENAMIENTO PERSONALIZADO</p>
+                <p style={{ margin: '10px 0 0 0', fontSize: '11px', fontWeight: 700, letterSpacing: '4px', color: '#a2d149', textTransform: 'uppercase' }}>PLAN DE ENTRENAMIENTO PERSONALIZADO</p>
                 <p style={{ margin: '5px 0 0 0', fontSize: '13px', color: '#ccc' }}>Hola, {user?.name}</p>
             </div>
 
@@ -180,13 +282,13 @@ const ClientRoutine = () => {
             <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px', position: 'relative' }}>
                 <div style={{
                     position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                    backgroundImage: `url(${logoBody})`, backgroundRepeat: 'repeat', backgroundSize: '150px',
-                    opacity: 0.07, pointerEvents: 'none', zIndex: 0
+                    backgroundImage: `url(${logoBody2})`, backgroundRepeat: 'repeat', backgroundSize: '180px',
+                    opacity: 0.12, pointerEvents: 'none', zIndex: 0
                 }} />
 
                 {routineDays.length === 0 ? (
                     <div style={{ background: '#fff', padding: 40, borderRadius: 16, textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1, marginTop: 40 }}>
-                        <h3 style={{ color: '#c5a021' }}>Aún no tienes rutinas asignadas</h3>
+                        <h3 style={{ color: '#a2d149' }}>Aún no tienes rutinas asignadas</h3>
                         <p style={{ color: '#666' }}>Tu coach publicará tu plan aquí pronto.</p>
                     </div>
                 ) : (
@@ -197,7 +299,7 @@ const ClientRoutine = () => {
                                 onClick={() => setShowCoachInfo(!showCoachInfo)}
                                 style={{
                                     width: '100%',
-                                    background: 'linear-gradient(135deg, #1a1a1a 0%, #000 100%)',
+                                    background: 'linear-gradient(135deg, #1b3022 0%, #2d4739 100%)',
                                     color: '#fff',
                                     padding: '15px 20px',
                                     display: 'flex',
@@ -228,20 +330,20 @@ const ClientRoutine = () => {
                                     animation: 'fadeIn 0.3s ease-out',
                                     boxShadow: '0 10px 30px rgba(0,0,0,0.05)'
                                 }}>
-                                    <h3 style={{ color: '#c5a021', fontSize: '24px', fontWeight: 900, marginBottom: '15px', textTransform: 'uppercase' }}>¡Hola, {user?.name}!</h3>
-                                    <p style={{ fontSize: '15px', color: '#1a1a1a', lineHeight: '1.7', marginBottom: '30px', fontWeight: 500 }}>
+                                    <h3 style={{ color: '#a2d149', fontSize: '24px', fontWeight: 900, marginBottom: '15px', textTransform: 'uppercase' }}>¡Hola, {user?.name}!</h3>
+                                    <p style={{ fontSize: '15px', color: '#1b3022', lineHeight: '1.7', marginBottom: '30px', fontWeight: 500 }}>
                                         <strong style={{ color: '#111', fontWeight: 900 }}>Soy {coachName || 'tu coach'}, tu entrenador personal.</strong> Mi trabajo se trata de ser tu guía, tu motivador y tu mayor apoyo en este camino. Estoy aquí para ofrecerte el conocimiento y la dedicación que necesitas para transformar tu cuerpo y tu mente. Mi enfoque es totalmente personalizado, garantizando que cada plan esté diseñado para tus objetivos únicos, tus capacidades y tu estilo de vida.
                                     </p>
 
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '30px' }}>
-                                        <div style={{ paddingLeft: '20px', borderLeft: '5px solid #c5a021' }}>
-                                            <h4 style={{ color: '#c5a021', fontSize: '18px', fontWeight: 900, marginBottom: '10px' }}>MISIÓN</h4>
+                                        <div style={{ paddingLeft: '20px', borderLeft: '5px solid #a2d149' }}>
+                                            <h4 style={{ color: '#a2d149', fontSize: '18px', fontWeight: 900, marginBottom: '10px' }}>MISIÓN</h4>
                                             <p style={{ fontSize: '13px', color: '#444', lineHeight: '1.6', margin: 0 }}>
                                                 Empoderar a las personas a través del ejercicio y el conocimiento, creando planes inteligentes que no solo construyan un cuerpo fuerte, sino también una mentalidad resiliente y segura.
                                             </p>
                                         </div>
-                                        <div style={{ paddingLeft: '20px', borderLeft: '5px solid #c5a021' }}>
-                                            <h4 style={{ color: '#c5a021', fontSize: '18px', fontWeight: 900, marginBottom: '10px' }}>VISIÓN</h4>
+                                        <div style={{ paddingLeft: '20px', borderLeft: '5px solid #a2d149' }}>
+                                            <h4 style={{ color: '#a2d149', fontSize: '18px', fontWeight: 900, marginBottom: '10px' }}>VISIÓN</h4>
                                             <p style={{ fontSize: '13px', color: '#444', lineHeight: '1.6', margin: 0 }}>
                                                 Ser el catalizador del cambio, ayudando a alcanzar un bienestar físico y mental sostenible, convirtiendo la disciplina en un hábito.
                                             </p>
@@ -258,7 +360,7 @@ const ClientRoutine = () => {
                                     onClick={() => setShowProfile(!showProfile)}
                                     style={{
                                         width: '100%',
-                                        background: 'linear-gradient(135deg, #c5a021 0%, #a38210 100%)',
+                                        background: 'linear-gradient(135deg, #a2d149 0%, #a38210 100%)',
                                         color: '#fff',
                                         padding: '15px 20px',
                                         display: 'flex',
@@ -270,7 +372,7 @@ const ClientRoutine = () => {
                                         fontSize: '14px',
                                         textTransform: 'uppercase',
                                         cursor: 'pointer',
-                                        boxShadow: '0 4px 15px rgba(197, 160, 33, 0.2)',
+                                        boxShadow: '0 4px 15px rgba(162, 209, 73, 0.2)',
                                         letterSpacing: '1px'
                                     }}
                                 >
@@ -283,7 +385,7 @@ const ClientRoutine = () => {
                                         background: '#fff',
                                         padding: '25px',
                                         borderRadius: '0 0 16px 16px',
-                                        border: '2px solid #c5a021',
+                                        border: '2px solid #a2d149',
                                         borderTop: 'none',
                                         marginTop: '-5px',
                                         animation: 'fadeIn 0.3s ease-out',
@@ -322,10 +424,10 @@ const ClientRoutine = () => {
                                                 onClick={() => setShowWeightHistory(true)}
                                                 style={{
                                                     background: '#111',
-                                                    color: '#c5a021',
+                                                    color: '#a2d149',
                                                     padding: '10px 25px',
                                                     borderRadius: '50px',
-                                                    border: '2px solid #c5a021',
+                                                    border: '2px solid #a2d149',
                                                     fontWeight: 800,
                                                     fontSize: '12px',
                                                     textTransform: 'uppercase',
@@ -337,12 +439,12 @@ const ClientRoutine = () => {
                                                     boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
                                                 }}
                                                 onMouseOver={e => {
-                                                    e.currentTarget.style.background = '#c5a021';
+                                                    e.currentTarget.style.background = '#a2d149';
                                                     e.currentTarget.style.color = '#fff';
                                                 }}
                                                 onMouseOut={e => {
                                                     e.currentTarget.style.background = '#111';
-                                                    e.currentTarget.style.color = '#c5a021';
+                                                    e.currentTarget.style.color = '#a2d149';
                                                 }}
                                             >
                                                 <History size={16} /> Ver Histórico de Peso
@@ -368,13 +470,13 @@ const ClientRoutine = () => {
                                     boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
                                 }}>
                                     <div style={{
-                                        background: '#111', color: '#c5a021', padding: '20px 25px',
+                                        background: '#111', color: '#a2d149', padding: '20px 25px',
                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                     }}>
                                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>
                                             Historial de Peso
                                         </h3>
-                                        <button onClick={() => setShowWeightHistory(false)} style={{ background: 'transparent', border: 'none', color: '#c5a021', cursor: 'pointer' }}>
+                                        <button onClick={() => setShowWeightHistory(false)} style={{ background: 'transparent', border: 'none', color: '#a2d149', cursor: 'pointer' }}>
                                             <X size={24} />
                                         </button>
                                     </div>
@@ -387,7 +489,7 @@ const ClientRoutine = () => {
                                                 {weightHistory.map((item) => (
                                                     <div key={item.id} style={{
                                                         background: '#f8fafc', padding: '15px 20px', borderRadius: '16px',
-                                                        borderLeft: '5px solid #c5a021', display: 'flex',
+                                                        borderLeft: '5px solid #a2d149', display: 'flex',
                                                         justifyContent: 'space-between', alignItems: 'center',
                                                         boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
                                                     }}>
@@ -495,11 +597,11 @@ const ClientRoutine = () => {
                                 <button
                                     onClick={() => setOpenDay(openDay === day.name ? null : day.name)}
                                     style={{
-                                        width: '100%', background: openDay === day.name ? '#c5a021' : '#fff', color: openDay === day.name ? '#fff' : '#111',
+                                        width: '100%', background: openDay === day.name ? '#a2d149' : '#fff', color: openDay === day.name ? '#fff' : '#111',
                                         padding: '18px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                         border: openDay === day.name ? 'none' : '2px solid #e5e7eb', borderRadius: 12, fontWeight: 900, fontSize: '18px',
                                         textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s',
-                                        boxShadow: openDay === day.name ? '0 8px 20px rgba(197, 160, 33, 0.3)' : 'none'
+                                        boxShadow: openDay === day.name ? '0 8px 20px rgba(162, 209, 73, 0.3)' : 'none'
                                     }}
                                 >
                                     {day.name}
@@ -513,15 +615,15 @@ const ClientRoutine = () => {
                                             const isBiserie = group.exercises.length > 1;
                                             return (
                                                 <div key={group.id} style={{
-                                                    background: '#fff', border: '2px solid #c5a021', borderRadius: 16,
-                                                    marginBottom: 25, overflow: 'hidden', boxShadow: isBiserie ? '0 8px 20px rgba(197, 160, 33, 0.12)' : '0 4px 12px rgba(0,0,0,0.03)'
+                                                    background: '#fff', border: '2px solid #a2d149', borderRadius: 16,
+                                                    marginBottom: 25, overflow: 'hidden', boxShadow: isBiserie ? '0 8px 20px rgba(162, 209, 73, 0.12)' : '0 4px 12px rgba(0,0,0,0.03)'
                                                 }}>
                                                     <div style={{ display: 'flex', height: 40, alignItems: 'stretch' }}>
                                                         <div style={{ background: '#ef4444', color: '#fff', padding: '0 20px', fontWeight: 900, fontSize: '12px', display: 'flex', alignItems: 'center', borderRadius: '0 0 15px 0', letterSpacing: '1px' }}>
                                                             {getDayAbbr(day.name)} | BLOQUE #{gIdx + 1}
                                                         </div>
                                                         {isBiserie && (
-                                                            <div style={{ background: '#c5a021', color: '#fff', flex: 1, padding: 10, fontWeight: 900, fontSize: '11px', letterSpacing: '1px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            <div style={{ background: '#a2d149', color: '#fff', flex: 1, padding: 10, fontWeight: 900, fontSize: '11px', letterSpacing: '1px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                                 BISERIE / SUPER SERIE
                                                             </div>
                                                         )}
@@ -558,7 +660,7 @@ const ClientRoutine = () => {
                                                                             {ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series || '0'} Series x ${ex.reps || '0'} Reps`}
                                                                         </div>
                                                                         {ex.note && (
-                                                                            <div style={{ fontSize: '14px', color: '#444', background: '#f8f9fa', padding: 15, borderRadius: 10, borderLeft: '4px solid #c5a021', fontWeight: 500 }}>
+                                                                            <div style={{ fontSize: '14px', color: '#444', background: '#f8f9fa', padding: 15, borderRadius: 10, borderLeft: '4px solid #a2d149', fontWeight: 500 }}>
                                                                                 {ex.note}
                                                                             </div>
                                                                         )}
@@ -596,8 +698,8 @@ const ClientRoutine = () => {
                 padding: '0 20px 50px 20px'
             }}>
                 <div style={{
-                    background: 'linear-gradient(135deg, #111 0%, #1a1a1a 100%)',
-                    border: '1px solid #c5a021',
+                    background: 'linear-gradient(135deg, #111 0%, #1b3022 100%)',
+                    border: '1px solid #a2d149',
                     borderRadius: 20,
                     padding: '28px 32px',
                     textAlign: 'center',
@@ -605,7 +707,7 @@ const ClientRoutine = () => {
                 }}>
                     <p style={{
                         fontSize: '10px', letterSpacing: '4px', textTransform: 'uppercase',
-                        color: '#c5a021', fontWeight: 800, margin: '0 0 8px 0'
+                        color: '#a2d149', fontWeight: 800, margin: '0 0 8px 0'
                     }}>
                         Contacta a tu Coach
                     </p>
@@ -623,7 +725,7 @@ const ClientRoutine = () => {
                             rel="noopener noreferrer"
                             style={{
                                 display: 'flex', alignItems: 'center', gap: 10,
-                                color: '#c5a021', textDecoration: 'none',
+                                color: '#a2d149', textDecoration: 'none',
                                 fontSize: '14px', fontWeight: 700,
                                 background: 'rgba(197,160,33,0.08)',
                                 padding: '10px 18px', borderRadius: 50,
@@ -632,7 +734,7 @@ const ClientRoutine = () => {
                             }}
                             onMouseOver={e => {
                                 e.currentTarget.style.background = 'rgba(197,160,33,0.18)';
-                                e.currentTarget.style.borderColor = '#c5a021';
+                                e.currentTarget.style.borderColor = '#a2d149';
                             }}
                             onMouseOut={e => {
                                 e.currentTarget.style.background = 'rgba(197,160,33,0.08)';
@@ -640,9 +742,9 @@ const ClientRoutine = () => {
                             }}
                         >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <rect x="2" y="2" width="20" height="20" rx="5" stroke="#c5a021" strokeWidth="2" />
-                                <circle cx="12" cy="12" r="4" stroke="#c5a021" strokeWidth="2" />
-                                <circle cx="17.5" cy="6.5" r="1.2" fill="#c5a021" />
+                                <rect x="2" y="2" width="20" height="20" rx="5" stroke="#a2d149" strokeWidth="2" />
+                                <circle cx="12" cy="12" r="4" stroke="#a2d149" strokeWidth="2" />
+                                <circle cx="17.5" cy="6.5" r="1.2" fill="#a2d149" />
                             </svg>
                             @jefeandrea
                         </a>
@@ -651,7 +753,7 @@ const ClientRoutine = () => {
                             href="tel:+571234567890"
                             style={{
                                 display: 'flex', alignItems: 'center', gap: 10,
-                                color: '#c5a021', textDecoration: 'none',
+                                color: '#a2d149', textDecoration: 'none',
                                 fontSize: '14px', fontWeight: 700,
                                 background: 'rgba(197,160,33,0.08)',
                                 padding: '10px 18px', borderRadius: 50,
@@ -660,7 +762,7 @@ const ClientRoutine = () => {
                             }}
                             onMouseOver={e => {
                                 e.currentTarget.style.background = 'rgba(197,160,33,0.18)';
-                                e.currentTarget.style.borderColor = '#c5a021';
+                                e.currentTarget.style.borderColor = '#a2d149';
                             }}
                             onMouseOut={e => {
                                 e.currentTarget.style.background = 'rgba(197,160,33,0.08)';
@@ -668,7 +770,7 @@ const ClientRoutine = () => {
                             }}
                         >
                             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M6.6 10.8C7.8 13.2 9.8 15.2 12.2 16.4L14 14.6C14.3 14.3 14.7 14.2 15 14.4C16.1 14.8 17.3 15 18.5 15C19.3 15 20 15.7 20 16.5V19.5C20 20.3 19.3 21 18.5 21C9.9 21 3 14.1 3 5.5C3 4.7 3.7 4 4.5 4H7.5C8.3 4 9 4.7 9 5.5C9 6.7 9.2 7.9 9.6 9C9.7 9.3 9.6 9.7 9.4 10L6.6 10.8Z" stroke="#c5a021" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M6.6 10.8C7.8 13.2 9.8 15.2 12.2 16.4L14 14.6C14.3 14.3 14.7 14.2 15 14.4C16.1 14.8 17.3 15 18.5 15C19.3 15 20 15.7 20 16.5V19.5C20 20.3 19.3 21 18.5 21C9.9 21 3 14.1 3 5.5C3 4.7 3.7 4 4.5 4H7.5C8.3 4 9 4.7 9 5.5C9 6.7 9.2 7.9 9.6 9C9.7 9.3 9.6 9.7 9.4 10L6.6 10.8Z" stroke="#a2d149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                             +57 1234567890
                         </a>

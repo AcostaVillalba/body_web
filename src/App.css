@@ -1,11 +1,11 @@
 :root {
-  --gold-500: #c5a021;
-  --gold-600: #a98818;
-  --gold-glow: rgba(197, 160, 33, 0.15);
-  --bg-base: #f0f2f5;
+  --primary-green: #a2d149;
+  --secondary-green: #2d4739;
+  --green-glow: rgba(162, 209, 73, 0.12);
+  --bg-base: #f4f7f5;
   --surface: #ffffff;
-  --border-light: #e5e7eb;
-  --text-main: #111827;
+  --border-light: #e0e7e1;
+  --text-main: #1a1a1a;
   --text-muted: #6b7280;
   --red-soft: #fee2e2;
   --red-text: #ef4444;
@@ -37,7 +37,7 @@ body {
   display: block;
   width: 60px;
   height: 4px;
-  background: var(--gold-500);
+  background: var(--primary-green);
   margin: 20px auto 0;
   border-radius: 4px;
 }
@@ -49,7 +49,7 @@ body {
   color: #111;
 }
 .header span {
-  color: var(--gold-500);
+  color: var(--primary-green);
 }
 .header p {
   color: var(--text-muted);
@@ -77,7 +77,7 @@ body {
   display: inline-block;
   width: 10px;
   height: 10px;
-  background: var(--gold-500);
+  background: var(--primary-green);
   border-radius: 50%;
 }
 
@@ -116,8 +116,8 @@ input, select, textarea {
   width: 100%;
 }
 input:focus, select:focus, textarea:focus {
-  border-color: var(--gold-500);
-  box-shadow: 0 0 0 3px var(--gold-glow);
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 3px var(--green-glow);
 }
 textarea {
   resize: vertical;
@@ -128,7 +128,7 @@ select option { background: #fff; color: #111; }
 /* Category Headers in Selects */
 optgroup {
   background: #f9f9f9;
-  color: var(--gold-500);
+  color: var(--primary-green);
   font-weight: 800;
 }
 
@@ -157,9 +157,9 @@ optgroup {
   color: var(--text-muted);
 }
 .days-selector label:has(input:checked) {
-  background: #fffdf5;
-  border-color: var(--gold-500);
-  color: var(--gold-600);
+  background: #fdfdfd;
+  border-color: var(--primary-green);
+  color: var(--secondary-green);
 }
 .days-selector input { display: none; }
 
@@ -182,15 +182,15 @@ optgroup {
 
 .btn-add-day {
   background: var(--surface);
-  color: var(--gold-600);
-  border: 2px solid var(--gold-500);
+  color: var(--secondary-green);
+  border: 2px solid var(--primary-green);
 }
 .btn-add-day:hover {
-  background: var(--gold-500);
+  background: var(--primary-green);
   color: #fff;
 }
-.main-add-btn { margin-left: auto; background: var(--gold-500); color: #fff; }
-.main-add-btn:hover { background: var(--gold-600); }
+.main-add-btn { margin-left: auto; background: var(--primary-green); color: #fff; }
+.main-add-btn:hover { background: var(--secondary-green); }
 
 /* Routine Days */
 .day-container {
@@ -218,10 +218,10 @@ optgroup {
   color: #fff;
 }
 .day-header .btn-add-day {
-  background: transparent; border: 2px solid var(--gold-500); color: var(--gold-500);
+  background: transparent; border: 2px solid var(--primary-green); color: var(--primary-green);
 }
 .day-header .btn-add-day:hover {
-  background: var(--gold-500); color: #111;
+  background: var(--primary-green); color: #111;
 }
 
 /* Exercise Groups */
@@ -254,7 +254,7 @@ optgroup {
   gap: 12px;
 }
 .metric-field { display: flex; flex-direction: column; }
-.metric-field label { color: var(--gold-600); }
+.metric-field label { color: var(--secondary-green); }
 .metric-field input { text-align: center; font-size: 16px; font-weight: 800; }
 
 /* Image Preview */
@@ -291,8 +291,8 @@ optgroup {
 }
 .btn-biserie:hover {
   color: #111;
-  border-color: var(--gold-500);
-  background: var(--gold-glow);
+  border-color: var(--primary-green);
+  background: var(--green-glow);
 }
 
 .btn-del {
@@ -309,17 +309,17 @@ optgroup {
 
 .rest-time-label {
   text-align: center;
-  color: var(--gold-600);
+  color: var(--secondary-green);
   font-weight: 800;
   font-size: 11px;
   margin-top: 25px;
   letter-spacing: 1px;
   padding: 10px;
-  background: #fffdf5;
+  background: #fdfdfd;
   border-radius: 8px;
   display: inline-block;
   width: 100%;
-  border: 1px dashed var(--gold-500);
+  border: 1px dashed var(--primary-green);
 }
 
 /* Generate Button */
@@ -336,10 +336,10 @@ optgroup {
   transition: all 0.3s ease;
 }
 .btn-generate:hover {
-  background: var(--gold-500);
+  background: var(--primary-green);
   color: #111;
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(197, 160, 33, 0.4);
+  box-shadow: 0 10px 25px rgba(162, 209, 73, 0.4);
 }
 
 /* Responsive */

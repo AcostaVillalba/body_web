@@ -13,6 +13,8 @@ class User(Base):
     google_id = Column(String, unique=True, nullable=True)
     is_active = Column(Boolean, default=True)
     coach_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    phone = Column(String, nullable=True)
+    instagram = Column(String, nullable=True)
 
     profile = relationship("ClientProfile", back_populates="user", uselist=False)
     routines = relationship("Routine", back_populates="user")
@@ -60,4 +62,25 @@ class WeightHistory(Base):
 
     user = relationship("User", back_populates="weight_history")
     routine = relationship("Routine", back_populates="weight_entries")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    message = Column(String)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    is_read = Column(Boolean, default=False)
+
+class Payment(Base):
+    __tablename__ = "payments"
+    id = Column(Integer, primary_key=True, index=True)
+    coach_id = Column(Integer, ForeignKey("users.id"))
+    client_id = Column(Integer, ForeignKey("users.id"))
+    client_name = Column(String)
+    amount = Column(Integer)
+    plan_type = Column(String)
+    status = Column(String, default="Pending") # Pending, Paid
+    batch_id = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
 
