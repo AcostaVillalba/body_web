@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { EXERCISES_DB, getImageUrl, preloadImage } from '../data';
-import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign } from 'lucide-react';
+import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign, Filter, Calendar, RotateCcw, Bell, Trash2 } from 'lucide-react';
 import '../App.css';
 import logoBody2 from '../assets/logobody2.png';
 import ExerciseImage from '../components/ExerciseImage';
@@ -62,14 +62,98 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
   const [isReadOnly, setIsReadOnly] = useState(propIsReadOnly || false);
   const [clients, setClients] = useState<AthleteData[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [planFilter, setPlanFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
 
   // Bloqueo de Coach Inactivo
   const isCoachBlocked = user?.role === 'Coach' && !user.isActive;
+
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   // Auth Headers Helper
   const authHeaders = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/notifications', { headers: authHeaders });
+      if (res.ok) {
+        const dbNotifs = await res.json();
+        setNotifications(dbNotifs);
+      }
+    } catch (e) { console.error("Error fetching notifications", e); }
+  };
+
+  // Efecto para verificar pagos pendientes (Viernes/Sábado antes de Domingo)
+  useEffect(() => {
+    const checkPaymentWarning = () => {
+      const now = new Date();
+      const day = now.getDay(); // 0: Dom, 1: Lun, ..., 5: Vie, 6: Sab
+      const dateKey = now.toISOString().split('T')[0];
+      
+      const pendingPayments = payments.filter(p => p.status === 'Pending');
+      
+      if (pendingPayments.length > 0 && (day === 5 || day === 6)) {
+        const msg = `⚠️ Tienes ${pendingPayments.length} pagos pendientes. Recuerda liquidar antes del domingo para evitar el bloqueo de tu cuenta.`;
+        
+        setNotifications(prev => {
+          // Si ya existe una notificación de advertencia sin leer hoy, no hacer nada
+          if (prev.some(n => n.id === `pay-warn-${dateKey}` && !n.is_read)) return prev;
+          
+          return [{
+            id: `pay-warn-${dateKey}`,
+            message: msg,
+            created_at: now.toISOString(),
+            is_read: false,
+            is_virtual: true
+          }, ...prev];
+        });
+      }
+    };
+
+    if (payments.length > 0) checkPaymentWarning();
+  }, [payments]);
+
+  // Cerrar notificaciones al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (isNotifOpen && !target.closest('.notif-container')) {
+        setIsNotifOpen(false);
+      }
+    };
+    document.onmousedown = handleClickOutside;
+    return () => { document.onmousedown = null; };
+  }, [isNotifOpen]);
+
+  useEffect(() => {
+    if (user) fetchNotifications();
+  }, [user]);
+
+  const markNotifRead = async (id: number | string) => {
+    if (typeof id === 'string') {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      return;
+    }
+    try {
+      await fetch(`http://localhost:8000/api/notifications/${id}/read`, { method: 'PATCH', headers: authHeaders });
+      fetchNotifications();
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteNotif = async (id: number | string) => {
+    if (typeof id === 'string') {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:8000/api/notifications/${id}`, { method: 'DELETE', headers: authHeaders });
+      if (res.ok) fetchNotifications();
+    } catch (e) { console.error(e); }
   };
 
   const emptyAthlete: AthleteData = {
@@ -115,6 +199,12 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
     // Poll for changes every 30 seconds to keep status in sync
     const interval = setInterval(fetchClients, 30000);
     if (user?.role === 'Admin') fetchCoaches();
+    
+    // Si el coach está bloqueado, forzar pestaña de pagos
+    if (user?.role === 'Coach' && !user.isActive) {
+      setActiveTab('payments');
+    }
+    
     return () => clearInterval(interval);
   }, [user]);
 
@@ -294,10 +384,21 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
     }
   };
 
-  const filteredClients = clients.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredClients = clients.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          c.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesPlan = planFilter === 'all' || (c.profile?.planType === planFilter);
+    const matchesStatus = statusFilter === 'all' || 
+                          (statusFilter === 'active' ? c.is_active : !c.is_active);
+    
+    return matchesSearch && matchesPlan && matchesStatus;
+  }).sort((a, b) => {
+    if (sortOrder === 'none') return 0;
+    const dateA = a.profile?.endDate || '';
+    const dateB = b.profile?.endDate || '';
+    if (sortOrder === 'asc') return dateA.localeCompare(dateB);
+    return dateB.localeCompare(dateA);
+  });
 
   // --- Routine Logic from Previous Code ---
   const handleDayToggle = (day: string) => {
@@ -470,12 +571,76 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
         {!hideHeader && (
           <>
-            <button
-              onClick={logout}
-              className="btn"
-              style={{ position: 'absolute', top: 20, right: 20, background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <LogOut size={16} /> Salir
-            </button>
+            <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', alignItems: 'center', gap: 15, zIndex: 1000 }}>
+              {/* Notification Bell */}
+              <div className="notif-container" style={{ position: 'relative' }}>
+                <button 
+                  onClick={() => setIsNotifOpen(!isNotifOpen)}
+                  style={{ background: '#f8fafc', border: 'none', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}
+                  onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
+                  onMouseOut={e => e.currentTarget.style.background = '#f8fafc'}
+                >
+                  <Bell size={20} />
+                  {notifications.filter(n => !n.is_read).length > 0 && (
+                    <div style={{ position: 'absolute', top: -2, right: -2, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 900, minWidth: 18, height: 18, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                      {notifications.filter(n => !n.is_read).length}
+                    </div>
+                  )}
+                </button>
+
+                {isNotifOpen && (
+                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 10, width: 320, background: '#fff', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ padding: '15px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>NOTIFICACIONES</span>
+                      <button onClick={() => setIsNotifOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: 16, cursor: 'pointer', color: '#94a3b8' }}>&times;</button>
+                    </div>
+                    <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                          No tienes notificaciones
+                        </div>
+                      ) : (
+                        notifications.map(n => (
+                          <div key={n.id} style={{ 
+                            padding: '15px 20px', 
+                            borderBottom: '1px solid #f1f5f9', 
+                            background: n.is_read ? '#fff' : '#f0fdf4',
+                            position: 'relative',
+                            transition: 'background 0.2s'
+                          }}>
+                            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#334155', fontWeight: n.is_read ? 500 : 700 }}>
+                              {n.message}
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                              <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
+                                {new Date(n.created_at).toLocaleDateString()}
+                              </span>
+                              <div style={{ display: 'flex', gap: 10 }}>
+                                {!n.is_read && (
+                                  <button onClick={() => markNotifRead(n.id)} style={{ background: 'transparent', border: 'none', color: '#10b981', fontSize: 10, fontWeight: 800, cursor: 'pointer', padding: 0 }}>
+                                    LEÍDO
+                                  </button>
+                                )}
+                                <button onClick={() => deleteNotif(n.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, opacity: 0.6 }}>
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={logout}
+                className="btn"
+                style={{ background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 5, padding: '10px 16px', borderRadius: 10 }}>
+                <LogOut size={16} /> Salir
+              </button>
+            </div>
 
             <div className="header" style={{ position: 'relative', zIndex: 1 }}>
               <img src={logoBody2} alt="Logo" style={{ width: 140, marginBottom: 20, filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.1))' }} />
@@ -490,20 +655,32 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
         {!viewingEmail && !hideTabs && (
           <div style={{ display: 'flex', gap: 10, marginBottom: 30 }}>
             <button
-              onClick={() => setActiveTab('create')}
+              onClick={() => !isCoachBlocked && setActiveTab('create')}
               style={{
-                flex: 1, padding: '14px', background: activeTab === 'create' ? '#2d4739' : '#fff', color: activeTab === 'create' ? '#fff' : '#2d4739',
-                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: activeTab === 'create' ? '0 8px 16px rgba(0,0,0,0.1)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+                flex: 1, padding: '14px', 
+                background: activeTab === 'create' ? '#2d4739' : '#fff', 
+                color: activeTab === 'create' ? '#fff' : (isCoachBlocked ? '#cbd5e1' : '#2d4739'),
+                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', 
+                cursor: isCoachBlocked ? 'not-allowed' : 'pointer', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: activeTab === 'create' ? '0 8px 16px rgba(0,0,0,0.1)' : '0 2px 5px rgba(0,0,0,0.05)', 
+                transition: 'all 0.2s',
+                opacity: isCoachBlocked ? 0.6 : 1
               }}>
               <PlusCircle size={16} /> CREAR RUTINA
             </button>
             <button
-              onClick={() => setActiveTab('users')}
+              onClick={() => !isCoachBlocked && setActiveTab('users')}
               style={{
-                flex: 1, padding: '14px', background: activeTab === 'users' ? '#a2d149' : '#fff', color: activeTab === 'users' ? '#fff' : '#2d4739',
-                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: activeTab === 'users' ? '0 8px 16px rgba(197,160,33,0.2)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+                flex: 1, padding: '14px', 
+                background: activeTab === 'users' ? '#a2d149' : '#fff', 
+                color: activeTab === 'users' ? '#fff' : (isCoachBlocked ? '#cbd5e1' : '#2d4739'),
+                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', 
+                cursor: isCoachBlocked ? 'not-allowed' : 'pointer', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: activeTab === 'users' ? '0 8px 16px rgba(197,160,33,0.2)' : '0 2px 5px rgba(0,0,0,0.05)', 
+                transition: 'all 0.2s',
+                opacity: isCoachBlocked ? 0.6 : 1
               }}>
               <Users size={16} /> VER USUARIOS
             </button>
@@ -599,17 +776,74 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
           </div>
         ) : activeTab === 'users' ? (
           <div style={{ padding: '0 0 20px 0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 className="section-title" style={{ margin: 0 }}>Listado de Atletas</h2>
-              <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '10px 16px', borderRadius: 8, border: '2px solid #e2e8f0', width: 300 }}>
-                <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
-                <input
-                  type="text"
-                  placeholder="Buscar por nombre o email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '13px' }}
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '25px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 className="section-title" style={{ margin: 0 }}>Listado de Atletas</h2>
+                { (planFilter !== 'all' || statusFilter !== 'all' || sortOrder !== 'none' || searchQuery !== '') && (
+                  <button 
+                    onClick={() => { setPlanFilter('all'); setStatusFilter('all'); setSortOrder('none'); setSearchQuery(''); }}
+                    style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <RotateCcw size={12} /> Limpiar Filtros
+                  </button>
+                )}
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Buscador */}
+                <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '10px 16px', borderRadius: 10, border: '2px solid #e2e8f0', flex: '1 1 250px' }}>
+                  <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '13px' }}
+                  />
+                </div>
+
+                {/* Filtro Plan */}
+                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: 10, border: '2px solid #e2e8f0' }}>
+                  <Filter size={14} color="#64748b" style={{ marginRight: 8 }} />
+                  <select 
+                    value={planFilter}
+                    onChange={(e) => setPlanFilter(e.target.value)}
+                    style={{ border: 'none', outline: 'none', fontSize: '13px', color: '#475569', fontWeight: 600, background: 'transparent', cursor: 'pointer' }}
+                  >
+                    <option value="all">Todos los Planes</option>
+                    <option value="Mensual">Mensual</option>
+                    <option value="Dos meses">Dos meses</option>
+                    <option value="Trimestral">Trimestral</option>
+                  </select>
+                </div>
+
+                {/* Filtro Estado */}
+                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: 10, border: '2px solid #e2e8f0' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusFilter === 'active' ? '#10b981' : (statusFilter === 'inactive' ? '#ef4444' : '#cbd5e1'), marginRight: 8 }} />
+                  <select 
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{ border: 'none', outline: 'none', fontSize: '13px', color: '#475569', fontWeight: 600, background: 'transparent', cursor: 'pointer' }}
+                  >
+                    <option value="all">Todos los Estados</option>
+                    <option value="active">Activos</option>
+                    <option value="inactive">Inactivos</option>
+                  </select>
+                </div>
+
+                {/* Ordenar Fecha */}
+                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: 10, border: '2px solid #e2e8f0' }}>
+                  <Calendar size={14} color="#64748b" style={{ marginRight: 8 }} />
+                  <select 
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value as any)}
+                    style={{ border: 'none', outline: 'none', fontSize: '13px', color: '#475569', fontWeight: 600, background: 'transparent', cursor: 'pointer' }}
+                  >
+                    <option value="none">Sin Ordenar Fecha</option>
+                    <option value="asc">Fecha Fin: Ascendente</option>
+                    <option value="desc">Fecha Fin: Descendente</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -687,7 +921,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
             <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>Datos del Atleta</span>
-              {user?.role === 'Admin' && isExistingClient && (
+              {isExistingClient && (
                 <button
                   className="btn"
                   onClick={() => setIsRenewalActive(!isRenewalActive)}
@@ -696,7 +930,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                   {isRenewalActive ? '✓ Cancelar Renovación' : 'Renovar Plan'}
                 </button>
               )}
-              {user?.role === 'Admin' && isExistingClient && isRenewalActive && (
+              {isExistingClient && isRenewalActive && (
                 <button
                   className="btn"
                   onClick={handleAcceptRenewal}
@@ -936,9 +1170,9 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <button
                   className="btn btn-add-day main-add-btn"
                   onClick={renderDays}
-                  disabled={!athlete.is_active || isCoachBlocked}
-                  style={(!athlete.is_active || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
-                  title={isCoachBlocked ? "Tu cuenta está inactiva" : (!athlete.is_active ? "No se puede configurar rutina para atletas inactivos" : "")}
+                  disabled={(!athlete.is_active && !isRenewalActive) || isCoachBlocked}
+                  style={((!athlete.is_active && !isRenewalActive) || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
+                  title={isCoachBlocked ? "Tu cuenta está inactiva" : (!athlete.is_active && !isRenewalActive ? "No se puede configurar rutina para atletas inactivos" : "")}
                 >
                   Crear Días
                 </button>
@@ -1075,11 +1309,11 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
               <button
                 className="btn btn-generate"
                 onClick={publishRoutine}
-                disabled={isLoading || !athlete.is_active || isCoachBlocked}
-                style={(!athlete.is_active || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
-                title={isCoachBlocked ? "Tu cuenta está inactiva" : (!athlete.is_active ? "No se puede publicar rutina para atletas inactivos" : "")}
+                disabled={isLoading || (!athlete.is_active && !isRenewalActive) || isCoachBlocked}
+                style={((!athlete.is_active && !isRenewalActive) || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
+                title={isCoachBlocked ? "Tu cuenta está inactiva" : (!athlete.is_active && !isRenewalActive ? "No se puede publicar rutina para atletas inactivos" : "")}
               >
-                {isLoading ? 'PUBLICANDO...' : (isCoachBlocked ? 'ACCESO RESTRINGIDO' : (!athlete.is_active ? 'USUARIO INACTIVO' : 'PUBLICAR RUTINA'))}
+                {isLoading ? 'PUBLICANDO...' : (isCoachBlocked ? 'ACCESO RESTRINGIDO' : (!athlete.is_active && !isRenewalActive ? 'USUARIO INACTIVO' : 'PUBLICAR RUTINA'))}
               </button>
             )}
 

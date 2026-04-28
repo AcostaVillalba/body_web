@@ -908,9 +908,8 @@ const AdminDashboard = () => {
                   <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>TIPO DE PLAN</label>
                   <select value={editingProfile.profile?.planType || ''} onChange={e => setEditingProfile({ ...editingProfile, profile: { ...editingProfile.profile, planType: e.target.value } })} style={{ width: '100%', padding: '10px 12px', border: '2px solid #e2e8f0', borderRadius: 8, outline: 'none' }}>
                     <option value="Mensual">Mensual</option>
+                    <option value="Dos meses">Dos meses</option>
                     <option value="Trimestral">Trimestral</option>
-                    <option value="Semestral">Semestral</option>
-                    <option value="Anual">Anual</option>
                   </select>
                 </div>
               </div>

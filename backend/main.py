@@ -237,10 +237,21 @@ def save_client_profile(req: ClientDataReq, db: Session = Depends(get_db), curre
         profile.start_date = req.profile.startDate
         profile.end_date = req.profile.endDate
         
-        # Activar usuario si la fecha de fin es hoy o futura
-        today = datetime.now().strftime("%Y-%m-%d")
+        # Activar usuario inmediatamente al registrar/renovar
+        today = now_bogota().strftime("%Y-%m-%d")
         if profile.end_date >= today:
             user.is_active = True
+            
+        # Gestión de Pago (Solo si es nuevo o renovación)
+        payment = models.Payment(
+            coach_id=current_user.id,
+            client_id=user.id,
+            client_name=user.name,
+            amount=get_plan_price(req.profile.planType),
+            plan_type=req.profile.planType,
+            status="Pending"
+        )
+        db.add(payment)
 
     db.commit()
 
@@ -284,10 +295,21 @@ def update_client_profile(user_id: int, req: ClientDataReq, db: Session = Depend
             profile.start_date = req.profile.startDate
             profile.end_date = req.profile.endDate
             
-            # Activar usuario si la fecha de fin es hoy o futura
+            # Activar usuario inmediatamente al registrar/renovar
             today = now_bogota().strftime("%Y-%m-%d")
             if profile.end_date >= today:
                 user.is_active = True
+
+            # Gestión de Pago por Renovación
+            payment = models.Payment(
+                coach_id=current_user.id,
+                client_id=user.id,
+                client_name=user.name,
+                amount=get_plan_price(req.profile.planType),
+                plan_type=req.profile.planType,
+                status="Pending"
+            )
+            db.add(payment)
             
         db.commit()
         print(f"PERF: save_client_profile DB commit took {time.time() - start_time:.4f}s")
@@ -386,21 +408,20 @@ def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session
 
     return {"status": "success", "message": "Routine published and backed up to BigQuery"}
 
+def get_plan_price(plan_type: str):
+    prices = {
+        "Mensual": 20000,
+        "Dos meses": 40000,
+        "Trimestral": 60000
+    }
+    return prices.get(plan_type, 20000)
+
 @app.post("/api/coach/publish-all")
 def publish_all(req: PublishAllReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
     if current_user.role == "Coach" and not current_user.is_active:
         raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
 
     overall_start = time.time()
-
-    def get_plan_price(plan_type: str):
-        prices = {
-            "Mensual": 20000,
-            "Dos Meses": 40000,
-            "Trimestral": 60000,
-            "Anual": 120000
-        }
-        return prices.get(plan_type, 20000)
 
     # 1. Actualizar Perfil (Lógica de save_client_profile integrada)
     user = db.query(models.User).filter(models.User.email == req.athlete.email).first()
@@ -432,7 +453,8 @@ def publish_all(req: PublishAllReq, background_tasks: BackgroundTasks, db: Sessi
         profile.plan_type = req.athlete.profile.planType
         profile.start_date = req.athlete.profile.startDate
         profile.end_date = req.athlete.profile.endDate
-        today = datetime.now().strftime("%Y-%m-%d")
+        # Activar usuario inmediatamente al registrar/renovar
+        today = now_bogota().strftime("%Y-%m-%d")
         if profile.end_date >= today:
             user.is_active = True
 
@@ -523,17 +545,21 @@ def get_my_routine(db: Session = Depends(get_db), current_user: models.User = De
         "controlDate": prof.control_date if prof else ""
     }
     
-    # Fetch assigned coach name
-    coach_name = None
+    # Fetch assigned coach details
+    coach_info = None
     if current_user.coach_id:
         coach = db.query(models.User).filter(models.User.id == current_user.coach_id).first()
         if coach:
-            coach_name = coach.name
+            coach_info = {
+                "name": coach.name,
+                "phone": coach.phone,
+                "instagram": coach.instagram
+            }
 
     return {
         "status": "success", 
         "routine_data": routine.routine_data,
-        "coach_name": coach_name,
+        "coach": coach_info,
         "profile": profile_data
     }
 
@@ -655,11 +681,34 @@ def get_coach_payments(db: Session = Depends(get_db), current_user: models.User 
 @app.post("/api/coach/payments/pay")
 def pay_balance(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
     batch_id = str(uuid.uuid4())
+    
+    # 1. Obtener los IDs de los clientes asociados a pagos pendientes antes de actualizar
+    pending_payments = db.query(models.Payment).filter(
+        models.Payment.coach_id == current_user.id, 
+        models.Payment.status == "Pending"
+    ).all()
+    
+    client_ids = [p.client_id for p in pending_payments]
+    
+    # 2. Marcar pagos como pagados
     db.query(models.Payment)\
         .filter(models.Payment.coach_id == current_user.id, models.Payment.status == "Pending")\
-        .update({"status": "Paid", "batch_id": batch_id})
+        .update({"status": "Paid", "batch_id": batch_id}, synchronize_session=False)
+    
+    # 3. Reactivar al Coach
+    current_user.is_active = True
+    
+    # 4. Reactivar a los clientes afectados por este pago
+    # Solo los activamos si la fecha de fin del plan es hoy o futura
+    today_str = now_bogota().strftime("%Y-%m-%d")
+    for cid in set(client_ids):
+        u = db.query(models.User).filter(models.User.id == cid).first()
+        if u and u.profile:
+            if u.profile.end_date >= today_str:
+                u.is_active = True
+    
     db.commit()
-    return {"message": "Saldo pagado exitosamente", "batch_id": batch_id}
+    return {"message": "Saldo pagado exitosamente. Cuenta y atletas reactivados.", "batch_id": batch_id}
 
 # ====================
 # ADMIN PAGOS

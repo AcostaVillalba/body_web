@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,14 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    const msg = localStorage.getItem('plan_expired_msg');
+    if (msg) {
+      setErrorMsg(msg);
+      localStorage.removeItem('plan_expired_msg');
+    }
+  }, []);
 
   const handleSuccess = async (credentialResponse: CredentialResponse) => {
     try {
@@ -32,7 +40,7 @@ const Login = () => {
       // El bloqueo por inactividad solo debe aplicar a Clientes. 
       // Los Coaches y Admins deben poder entrar siempre.
       if (data.role === 'Client' && data.is_active === false) {
-        throw new Error("Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso.");
+        throw new Error("Tu plan ha expirado, contacta con tu coach de confianza para renovar tu plan");
       }
 
       login(data.access_token, {
