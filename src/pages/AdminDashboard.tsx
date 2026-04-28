@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight, DollarSign, FileText } from 'lucide-react';
 import CoachDashboard, { type RoutineDay } from './CoachDashboard';
 import '../App.css';
+import logoBody2 from '../assets/logobody2.png';
 
 const AdminDashboard = () => {
   const { token, logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'create' | 'coaches'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'create' | 'coaches' | 'payments'>('users');
   const [clients, setClients] = useState<any[]>([]);
   const [coachesList, setCoachesList] = useState<any[]>([]); // Para la pestaña de gestión
-  const [newCoach, setNewCoach] = useState({ name: '', email: '' });
+  const [adminPayments, setAdminPayments] = useState<any[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<any | null>(null);
+  const [newCoach, setNewCoach] = useState({ name: '', email: '', phone: '', instagram: '' });
   const [editingClientEmail, setEditingClientEmail] = useState<string | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<RoutineDay[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingCoachId, setEditingCoachId] = useState<number | null>(null); // Nuevo estado para editar coaches
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -50,11 +54,22 @@ const AdminDashboard = () => {
     fetchCoaches();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'payments') fetchAdminPayments();
+  }, [activeTab]);
+
+  const fetchAdminPayments = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/payments', { headers: authHeaders });
+      if (res.ok) setAdminPayments(await res.json());
+    } catch (e) { console.error("Error fetching admin payments", e); }
+  };
+
   const fetchCoaches = async () => {
     try {
       const res = await fetch('http://localhost:8000/api/coach/list', { headers: authHeaders });
       if (res.ok) setCoaches(await res.json());
-      
+
       const resAdmin = await fetch('http://localhost:8000/api/admin/coaches', { headers: authHeaders });
       if (resAdmin.ok) setCoachesList(await resAdmin.json());
     } catch (e) { console.error("Error fetching coaches", e); }
@@ -69,14 +84,41 @@ const AdminDashboard = () => {
         body: JSON.stringify(newCoach)
       });
       if (res.ok) {
-        setNewCoach({ name: '', email: '' });
+        setNewCoach({ name: '', email: '', phone: '', instagram: '' });
+        setEditingCoachId(null);
         fetchCoaches();
-        alert("Coach registrado correctamente");
+        alert(editingCoachId ? "Coach actualizado correctamente" : "Coach registrado correctamente");
       } else {
         const data = await res.json();
-        alert(data.detail || "Error al registrar coach");
+        alert(data.detail || "Error al procesar coach");
       }
     } catch (e) { console.error(e); }
+  };
+
+  const handleToggleCoachStatus = async (coachId: number, currentStatus: boolean) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/admin/users/${coachId}/status`, {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ is_active: !currentStatus })
+      });
+      if (res.ok) {
+        fetchCoaches();
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Error al cambiar estado del coach");
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleStartEditCoach = (coach: any) => {
+    setEditingCoachId(coach.id);
+    setNewCoach({
+      name: coach.name,
+      email: coach.email,
+      phone: coach.phone || '',
+      instagram: coach.instagram || ''
+    });
   };
 
   const handleDeleteCoach = async (id: number) => {
@@ -196,16 +238,25 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div style={{ background: '#f0f2f5', minHeight: '100vh', paddingBottom: 40, fontFamily: "'Montserrat', sans-serif" }}>
+    <div style={{ background: '#f4f7f5', minHeight: '100vh', paddingBottom: 40, fontFamily: "'Montserrat', sans-serif", position: 'relative' }}>
+      {/* Background Watermark */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+        backgroundImage: `url(${logoBody2})`, backgroundRepeat: 'repeat', backgroundSize: '200px',
+        opacity: 0.08, pointerEvents: 'none', zIndex: 0
+      }} />
       {/* Top Banner */}
-      <div style={{ background: '#111', padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900, letterSpacing: '-0.5px' }}>
-            BODY <span style={{ color: '#c5a021' }}>LOGIC</span>
-          </h1>
-          <p style={{ margin: 0, fontSize: '11px', color: '#888', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: 800 }}>
-            ADMINISTRATOR PANEL
-          </p>
+      <div style={{ background: '#2d4739', padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', position: 'relative', zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <img src={logoBody2} alt="Logo" style={{ width: 60, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+          <div>
+            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900, letterSpacing: '-0.5px' }}>
+              BODY <span style={{ color: '#a2d149' }}>LOGIC</span>
+            </h1>
+            <p style={{ margin: 0, fontSize: '11px', color: '#a2d149', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: 800 }}>
+              ADMINISTRATOR PANEL
+            </p>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#ccc' }}>Hola, {user?.name}</span>
@@ -223,29 +274,46 @@ const AdminDashboard = () => {
           <button
             onClick={() => { setActiveTab('users'); setEditingClientEmail(null); }}
             style={{
-              flex: 1, padding: '16px', background: activeTab === 'users' ? '#c5a021' : '#fff', color: activeTab === 'users' ? '#fff' : '#111',
-              border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              boxShadow: activeTab === 'users' ? '0 8px 16px rgba(197,160,33,0.3)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
+              background: activeTab === 'users' ? '#a2d149' : '#fff',
+              color: activeTab === 'users' ? '#1e293b' : '#64748b',
+              boxShadow: activeTab === 'users' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
             }}>
             <Users size={18} /> ADMINISTRAR USUARIOS
           </button>
           <button
-            onClick={() => setActiveTab('create')}
+            onClick={() => { setActiveTab('create'); setEditingClientEmail(null); }}
             style={{
-              flex: 1, padding: '16px', background: activeTab === 'create' ? '#111' : '#fff', color: activeTab === 'create' ? '#fff' : '#111',
-              border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              boxShadow: activeTab === 'create' ? '0 8px 16px rgba(0,0,0,0.3)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
+              background: activeTab === 'create' ? '#a2d149' : '#fff',
+              color: activeTab === 'create' ? '#1e293b' : '#64748b',
+              boxShadow: activeTab === 'create' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
             }}>
             <PlusCircle size={18} /> CREAR RUTINA
           </button>
           <button
-            onClick={() => setActiveTab('coaches')}
+            onClick={() => { setActiveTab('coaches'); setEditingClientEmail(null); }}
             style={{
-              flex: 1, padding: '16px', background: activeTab === 'coaches' ? '#571665ff' : '#fff', color: activeTab === 'coaches' ? '#fff' : '#111',
-              border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              boxShadow: activeTab === 'coaches' ? '0 8px 16px rgba(87,22,101,0.3)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
+              background: activeTab === 'coaches' ? '#a2d149' : '#fff',
+              color: activeTab === 'coaches' ? '#1e293b' : '#64748b',
+              boxShadow: activeTab === 'coaches' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
             }}>
             <Shield size={18} /> GESTIÓN DE COACHES
+          </button>
+          <button
+            onClick={() => { setActiveTab('payments'); setEditingClientEmail(null); }}
+            style={{
+              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
+              background: activeTab === 'payments' ? '#a2d149' : '#fff',
+              color: activeTab === 'payments' ? '#1e293b' : '#64748b',
+              boxShadow: activeTab === 'payments' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
+            }}>
+            <DollarSign size={18} /> CONTROL DE PAGOS
           </button>
         </div>
 
@@ -255,24 +323,43 @@ const AdminDashboard = () => {
           {/* TAB 1: USERS */}
           {activeTab === 'users' && !editingClientEmail && (() => {
             const filteredClients = clients.filter(c => {
-              const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                c.email.toLowerCase().includes(searchQuery.toLowerCase());
-              const matchesPlan = filters.planType === 'all' ||
-                (c.profile?.planType === filters.planType);
-              const matchesCoach = filters.coachId === 'all' ||
-                (String(c.coach_id) === String(filters.coachId));
-              const matchesStatus = filters.status === 'all' || 
-                (filters.status === 'active' ? c.is_active : !c.is_active);
+              if (filters.status === 'active' && !c.is_active) return false;
+              if (filters.status === 'inactive' && c.is_active) return false;
               
-              return matchesSearch && matchesStatus && matchesPlan && matchesCoach;
+              if (filters.planType !== 'all' && c.profile?.planType !== filters.planType) return false;
+              if (filters.coachId !== 'all' && String(c.coach_id) !== filters.coachId) return false;
+
+              if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) {
+                  return false;
+                }
+              }
+
+              return true;
             }).sort((a, b) => {
+              // Helper para parsear DD/MM/YYYY a un timestamp de manera segura
+              const parseDate = (dateStr?: string) => {
+                if (!dateStr) return 0;
+                const parts = dateStr.split('/');
+                if (parts.length === 3) {
+                  // Asumiendo formato DD/MM/YYYY
+                  return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
+                }
+                return 0;
+              };
+
+              let valA = 0;
+              let valB = 0;
+
               const field = filters.dateType === 'start' ? 'startDate' : 'endDate';
-              const dateA = a.profile?.[field] ? new Date(a.profile[field]).getTime() : 0;
-              const dateB = b.profile?.[field] ? new Date(b.profile[field]).getTime() : 0;
-              return filters.dateSort === 'desc' ? dateB - dateA : dateA - dateB;
+              valA = parseDate(a.profile?.[field]);
+              valB = parseDate(b.profile?.[field]);
+
+              return filters.dateSort === 'desc' ? valB - valA : valA - valB;
             });
 
-            const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+            const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE) || 1;
             const paginatedClients = filteredClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
             // Pagination Helper: generate page numbers with ellipsis
@@ -306,8 +393,8 @@ const AdminDashboard = () => {
                       <button
                         onClick={() => setIsFilterOpen(!isFilterOpen)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 8, background: isFilterOpen ? '#c5a021' : '#fff',
-                          color: isFilterOpen ? '#fff' : '#1e293b', border: '2px solid', borderColor: isFilterOpen ? '#c5a021' : '#e2e8f0',
+                          display: 'flex', alignItems: 'center', gap: 8, background: isFilterOpen ? '#a2d149' : '#fff',
+                          color: isFilterOpen ? '#fff' : '#1e293b', border: '2px solid', borderColor: isFilterOpen ? '#a2d149' : '#e2e8f0',
                           padding: '10px 16px', borderRadius: 8, fontSize: '13px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
                         }}>
                         <Filter size={16} /> FILTRAR <ChevronDown size={14} style={{ transform: isFilterOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
@@ -319,7 +406,7 @@ const AdminDashboard = () => {
                           borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', zIndex: 100, padding: 20
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: '#111' }}>OPCIONES DE FILTRO</span>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: '#2d4739' }}>OPCIONES DE FILTRO</span>
                             <button
                               onClick={() => setFilters({ status: 'all', planType: 'all', dateType: 'end', dateSort: 'desc', coachId: 'all' })}
                               style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -407,7 +494,7 @@ const AdminDashboard = () => {
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Email</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Plan / Objetivo</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Inicio del Plan</th>
-                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Coach</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800 }}>Estado de Acceso</th>
                         <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
@@ -463,7 +550,7 @@ const AdminDashboard = () => {
                             )}
                           </td>
                           <td style={{ padding: '20px' }}>
-                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#c5a021', textTransform: 'uppercase' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#a2d149', textTransform: 'uppercase' }}>
                               {coaches.find(co => String(co.id) === String(c.coach_id))?.name || 'Sin asignar'}
                             </div>
                           </td>
@@ -501,7 +588,7 @@ const AdminDashboard = () => {
                                 background: '#fff', border: '2px solid #e2e8f0', color: '#0f172a', padding: '8px 12px', marginRight: 8,
                                 borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
                               }}
-                              onMouseOver={e => { e.currentTarget.style.borderColor = '#c5a021'; e.currentTarget.style.color = '#c5a021'; }}
+                              onMouseOver={e => { e.currentTarget.style.borderColor = '#a2d149'; e.currentTarget.style.color = '#a2d149'; }}
                               onMouseOut={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
                             >
                               <Settings size={14} /> Editar Datos
@@ -512,7 +599,7 @@ const AdminDashboard = () => {
                                 background: '#fff', border: '2px solid #e2e8f0', color: '#0f172a', padding: '8px 16px',
                                 borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
                               }}
-                              onMouseOver={e => { e.currentTarget.style.borderColor = '#c5a021'; e.currentTarget.style.color = '#c5a021'; }}
+                              onMouseOver={e => { e.currentTarget.style.borderColor = '#a2d149'; e.currentTarget.style.color = '#a2d149'; }}
                               onMouseOut={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
                             >
                               <Edit3 size={14} /> Ver / Editar Rutina
@@ -522,7 +609,7 @@ const AdminDashboard = () => {
                       ))}
                       {paginatedClients.length === 0 && (
                         <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                          <td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
                             {clients.length === 0 ? 'No hay atletas registrados aún.' : 'No se encontraron resultados para la búsqueda.'}
                           </td>
                         </tr>
@@ -535,7 +622,7 @@ const AdminDashboard = () => {
                 {totalPages > 1 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 30, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
                     <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
-                      Mostrando <span style={{ color: '#111' }}>{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</span> a <span style={{ color: '#111' }}>{Math.min(currentPage * ITEMS_PER_PAGE, filteredClients.length)}</span> de <span style={{ color: '#111' }}>{filteredClients.length}</span> resultados
+                      Mostrando <span style={{ color: '#2d4739' }}>{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</span> a <span style={{ color: '#2d4739' }}>{Math.min(currentPage * ITEMS_PER_PAGE, filteredClients.length)}</span> de <span style={{ color: '#2d4739' }}>{filteredClients.length}</span> resultados
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -559,8 +646,8 @@ const AdminDashboard = () => {
                             onClick={() => typeof p === 'number' && setCurrentPage(p)}
                             style={{
                               minWidth: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              borderRadius: 8, border: '1px solid', borderColor: p === currentPage ? '#111' : p === '...' ? 'transparent' : '#e2e8f0',
-                              background: p === currentPage ? '#111' : 'transparent',
+                              borderRadius: 8, border: '1px solid', borderColor: p === currentPage ? '#2d4739' : p === '...' ? 'transparent' : '#e2e8f0',
+                              background: p === currentPage ? '#2d4739' : 'transparent',
                               color: p === currentPage ? '#fff' : p === '...' ? '#94a3b8' : '#1e293b',
                               cursor: p === '...' ? 'default' : 'pointer', fontSize: '13px', fontWeight: 800, transition: 'all 0.2s'
                             }}
@@ -608,41 +695,67 @@ const AdminDashboard = () => {
           {/* TAB 2: CREATE ROUTINE (COACH MODE) */}
           {activeTab === 'create' && (
             <div style={{ padding: '0' }}>
-              <CoachDashboard hideHeader={true} />
+              <CoachDashboard hideHeader={true} hideTabs={true} />
             </div>
           )}
 
           {/* TAB 3: COACH MANAGEMENT */}
           {activeTab === 'coaches' && (
-            <div style={{ padding: 40 }}>
-              <div style={{ display: 'flex', gap: 40 }}>
+            <div style={{ padding: '30px 40px' }}>
+              <div style={{ display: 'flex', gap: 30 }}>
                 {/* Formulario Izquierda */}
-                <div style={{ flex: '0 0 350px' }}>
-                  <div className="section-title" style={{ marginTop: 0 }}>Registrar Nuevo Coach</div>
+                <div style={{ flex: '0 0 320px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="section-title" style={{ marginTop: 0 }}>{editingCoachId ? 'Editar Coach' : 'Registrar Nuevo Coach'}</div>
+                    {editingCoachId && (
+                      <button 
+                        onClick={() => { setEditingCoachId(null); setNewCoach({ name: '', email: '', phone: '', instagram: '' }); }}
+                        style={{ background: '#f1f5f9', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontWeight: 800 }}
+                      >CANCELAR</button>
+                    )}
+                  </div>
                   <form onSubmit={handleCreateCoach} style={{ background: '#f8fafc', padding: 25, borderRadius: 16, border: '2px solid #e2e8f0' }}>
                     <div style={{ marginBottom: 15 }}>
                       <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>NOMBRE COMPLETO</label>
-                      <input 
-                        required 
+                      <input
+                        required
                         placeholder="Ej: Juan Pérez"
-                        value={newCoach.name} 
-                        onChange={e => setNewCoach({...newCoach, name: e.target.value})}
-                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }} 
+                        value={newCoach.name}
+                        onChange={e => setNewCoach({ ...newCoach, name: e.target.value })}
+                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>CORREO GMAIL</label>
+                      <input
+                        required
+                        type="email"
+                        placeholder="ejemplo@gmail.com"
+                        value={newCoach.email}
+                        onChange={e => setNewCoach({ ...newCoach, email: e.target.value })}
+                        style={{ width: '100%', padding: '12px', border: editingCoachId ? '1px solid #e2e8f0' : '1px solid #a2d149', borderRadius: 8, outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>TELÉFONO</label>
+                      <input
+                        placeholder="Ej: +57 300 123 4567"
+                        value={newCoach.phone}
+                        onChange={e => setNewCoach({ ...newCoach, phone: e.target.value })}
+                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
                       />
                     </div>
                     <div style={{ marginBottom: 20 }}>
-                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>CORREO GMAIL</label>
-                      <input 
-                        required 
-                        type="email"
-                        placeholder="ejemplo@gmail.com"
-                        value={newCoach.email} 
-                        onChange={e => setNewCoach({...newCoach, email: e.target.value})}
-                        style={{ width: '100%', padding: '12px', border: '1px solid #c5a021', borderRadius: 8, outline: 'none' }} 
+                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>INSTAGRAM (USUARIO)</label>
+                      <input
+                        placeholder="Ej: @coach_fitness"
+                        value={newCoach.instagram}
+                        onChange={e => setNewCoach({ ...newCoach, instagram: e.target.value })}
+                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
                       />
                     </div>
-                    <button style={{ width: '100%', background: '#111', color: '#fff', padding: '14px', borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      <PlusCircle size={18} /> AGREGAR COACH
+                    <button style={{ width: '100%', background: '#2d4739', color: '#fff', padding: '14px', borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      {editingCoachId ? <Save size={18} /> : <PlusCircle size={18} />} {editingCoachId ? 'GUARDAR CAMBIOS' : 'AGREGAR COACH'}
                     </button>
                   </form>
                 </div>
@@ -653,29 +766,54 @@ const AdminDashboard = () => {
                   <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                       <thead>
-                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '11px', textTransform: 'uppercase' }}>
-                          <th style={{ padding: '15px 20px', fontWeight: 800 }}>Nombre</th>
-                          <th style={{ padding: '15px 20px', fontWeight: 800 }}>Email</th>
-                          <th style={{ padding: '15px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '10px', textTransform: 'uppercase' }}>
+                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Nombre</th>
+                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Email</th>
+                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Teléfono</th>
+                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Instagram</th>
+                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Estado</th>
+                          <th style={{ padding: '12px 10px', fontWeight: 800, textAlign: 'center' }}>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {coachesList.map(c => (
                           <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '15px 20px', fontWeight: 700 }}>{c.name}</td>
-                            <td style={{ padding: '15px 20px', color: '#64748b' }}>{c.email}</td>
-                            <td style={{ padding: '15px 20px', textAlign: 'right' }}>
-                              <button 
-                                onClick={() => handleDeleteCoach(c.id)}
-                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}
-                              >
-                                Eliminar
-                              </button>
-                            </td>
+                            <td style={{ padding: '12px 10px', fontWeight: 700, fontSize: '12px' }}>{c.name}</td>
+                            <td style={{ padding: '12px 10px', color: '#64748b', fontSize: '12px' }}>{c.email}</td>
+                            <td style={{ padding: '12px 10px', color: '#64748b', fontSize: '12px' }}>{c.phone || '-'}</td>
+                            <td style={{ padding: '12px 10px', color: '#64748b', fontSize: '12px' }}>{c.instagram || '-'}</td>
+                            <td style={{ padding: '12px 10px' }}>
+                               <button
+                                 onClick={() => handleToggleCoachStatus(c.id, c.is_active)}
+                                 style={{ 
+                                   background: c.is_active ? '#dcfce7' : '#fee2e2', 
+                                   color: c.is_active ? '#166534' : '#991b1b',
+                                   border: 'none', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 800, fontSize: 10
+                                 }}
+                               >
+                                 {c.is_active ? 'ACTIVO' : 'INACTIVO'}
+                               </button>
+                             </td>
+                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                               <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                                 <button
+                                   onClick={() => handleStartEditCoach(c)}
+                                   style={{ background: 'transparent', border: 'none', color: '#2d4739', cursor: 'pointer', fontWeight: 800, fontSize: 11, padding: 0 }}
+                                 >
+                                   Editar
+                                 </button>
+                                 <button
+                                   onClick={() => handleDeleteCoach(c.id)}
+                                   style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 800, fontSize: 11, padding: 0 }}
+                                 >
+                                   Eliminar
+                                 </button>
+                               </div>
+                             </td>
                           </tr>
                         ))}
                         {coachesList.length === 0 && (
-                          <tr><td colSpan={3} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No hay coaches registrados.</td></tr>
+                          <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No hay coaches registrados.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -685,6 +823,47 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {/* TAB 4: CONTROL DE PAGOS */}
+          {activeTab === 'payments' && (
+            <div style={{ background: '#fff', borderRadius: 20, padding: 30, boxShadow: '0 15px 40px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', margin: '0 20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 }}>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px' }}>CONTROL DE PAGOS DE COACHES</h2>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>FECHA</th>
+                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>COACH</th>
+                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>ATLETAS</th>
+                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>MONTO TOTAL</th>
+                      <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>ACCIONES</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminPayments.map((batch: any, i: number) => (
+                      <tr key={batch.batch_id || i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '16px 20px', fontSize: 13, fontWeight: 600 }}>{batch.date}</td>
+                        <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 800, color: '#2d4739' }}>{batch.coach_name}</td>
+                        <td style={{ padding: '16px 20px', fontSize: 13 }}>{batch.clients_count} atletas</td>
+                        <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 900, color: '#10b981' }}>${batch.total_amount.toLocaleString()}</td>
+                        <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                          <button 
+                            onClick={() => setSelectedBatch(batch)}
+                            style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <FileText size={14} /> VER FACTURA COMPLETA
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {adminPayments.length === 0 && (
+                      <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No hay registros de pagos.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -714,7 +893,7 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>CORREO DE INGRESO (IMPORTANTE)</label>
-                <input required type="email" value={editingProfile.email || ''} onChange={e => setEditingProfile({ ...editingProfile, email: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: '2px solid #c5a021', borderRadius: 8, outline: 'none', background: '#fefce8' }} />
+                <input required type="email" value={editingProfile.email || ''} onChange={e => setEditingProfile({ ...editingProfile, email: e.target.value })} style={{ width: '100%', padding: '10px 12px', border: '2px solid #a2d149', borderRadius: 8, outline: 'none', background: '#fefce8' }} />
               </div>
               <div style={{ display: 'flex', gap: 15 }}>
                 <div style={{ flex: 1 }}>
@@ -737,9 +916,9 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>ASIGNAR COACH</label>
-                <select 
-                  value={editingProfile.coach_id || ''} 
-                  onChange={e => setEditingProfile({ ...editingProfile, coach_id: e.target.value ? parseInt(e.target.value) : null })} 
+                <select
+                  value={editingProfile.coach_id || ''}
+                  onChange={e => setEditingProfile({ ...editingProfile, coach_id: e.target.value ? parseInt(e.target.value) : null })}
                   style={{ width: '100%', padding: '10px 12px', border: '2px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
                 >
                   <option value="">-- Sin asignar --</option>
@@ -748,10 +927,57 @@ const AdminDashboard = () => {
                   ))}
                 </select>
               </div>
-              <button disabled={statusMsg.text === 'Guardando...'} style={{ background: '#111', color: '#fff', padding: 12, borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Save size={16} /> GUARDAR CAMBIOS
+              <button disabled={statusMsg.text === 'Guardando...'} style={{ background: '#2d4739', color: '#fff', padding: 12, borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Save size={18} /> {statusMsg.text === 'Guardando...' ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DETALLES PAGO */}
+      {selectedBatch && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div style={{ background: '#fff', padding: 30, borderRadius: 16, width: '100%', maxWidth: 700, boxShadow: '0 20px 40px rgba(0,0,0,0.2)', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: 15, marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Detalles del Pago - {selectedBatch.coach_name}</h3>
+                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Fecha: {selectedBatch.date}</p>
+              </div>
+              <button
+                onClick={() => setSelectedBatch(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '10px', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '12px 15px' }}>Atleta</th>
+                    <th style={{ padding: '12px 15px' }}>Plan</th>
+                    <th style={{ padding: '12px 15px' }}>Periodo</th>
+                    <th style={{ padding: '12px 15px', textAlign: 'right' }}>Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedBatch.clients.map((c: any, i: number) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 15px', fontSize: 13, fontWeight: 700 }}>{c.name}</td>
+                      <td style={{ padding: '12px 15px', fontSize: 12 }}>{c.plan_type}</td>
+                      <td style={{ padding: '12px 15px', fontSize: 11, color: '#64748b' }}>{c.start_date} al {c.end_date}</td>
+                      <td style={{ padding: '12px 15px', fontSize: 13, fontWeight: 800, textAlign: 'right', color: '#10b981' }}>${c.amount.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div style={{ marginTop: 20, paddingTop: 15, borderTop: '2px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>TOTAL PAGADO</span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: '#2d4739' }}>${selectedBatch.total_amount.toLocaleString()}</span>
+            </div>
           </div>
         </div>
       )}

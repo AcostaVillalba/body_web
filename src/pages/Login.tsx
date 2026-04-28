@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import logoBody2 from '../assets/logobody2.jpeg';
+import logoBody2 from '../assets/logobody2.png';
 import '../App.css';
 
 const Login = () => {
@@ -55,31 +55,31 @@ const Login = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#000000ff', color: '#fff' }}>
-      <img src={logoBody2} alt="BODY LOGIC" style={{ width: 180, borderRadius: 20, marginBottom: 30 }} />
-      <h1 className="brand-logo" style={{ color: '#fff', fontSize: '3rem', margin: 0 }}>
-        BODY <span style={{ color: '#c5a021' }}>LOGIC</span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f4f7f5', color: '#1a1a1a' }}>
+      <img src={logoBody2} alt="BODY LOGIC" style={{ width: 220, marginBottom: 30, filter: 'drop-shadow(0 8px 16px rgba(162, 209, 73, 0.15))' }} />
+      <h1 className="brand-logo" style={{ color: '#2d4739', fontSize: '3rem', margin: 0 }}>
+        BODY <span style={{ color: '#a2d149' }}>LOGIC</span>
       </h1>
-      <p style={{ letterSpacing: '2px', textTransform: 'uppercase', fontSize: '11px', color: '#888', marginBottom: 4, fontWeight: 600 }}>
+      <p style={{ letterSpacing: '2px', textTransform: 'uppercase', fontSize: '11px', color: '#6b7280', marginBottom: 4, fontWeight: 600 }}>
         Resultados diseñados a tu medida
       </p>
-      <p style={{ letterSpacing: '4px', textTransform: 'uppercase', fontSize: '12px', color: '#c5a021', marginBottom: 50, fontWeight: 800 }}>
+      <p style={{ letterSpacing: '4px', textTransform: 'uppercase', fontSize: '12px', color: '#a2d149', marginBottom: 50, fontWeight: 800 }}>
         Control de Acceso
       </p>
 
       {/* Coach Contact Card */}
       <div style={{
-        background: 'linear-gradient(135deg, #1a1a1a 0%, #222 100%)',
+        background: '#ffffff',
         padding: '20px 32px',
         borderRadius: 16,
         textAlign: 'center',
-        border: '1px solid #c5a021',
+        border: '1px solid #a2d149',
         marginBottom: 20,
         width: '100%',
         maxWidth: 380,
-        boxShadow: '0 4px 24px rgba(197,160,33,0.12)'
+        boxShadow: '0 4px 24px rgba(162, 209, 73, 0.08)'
       }}>
-        <p style={{ fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: '#c5a021', fontWeight: 800, margin: '0 0 10px 0' }}>
+        <p style={{ fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: '#a2d149', fontWeight: 800, margin: '0 0 10px 0' }}>
           Comunícate con nosotros
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
@@ -90,7 +90,7 @@ const Login = () => {
             rel="noopener noreferrer"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              color: '#c5a021', textDecoration: 'none', fontSize: '13px', fontWeight: 600,
+              color: '#a2d149', textDecoration: 'none', fontSize: '13px', fontWeight: 600,
               transition: 'opacity 0.2s'
             }}
             onMouseOver={e => (e.currentTarget.style.opacity = '0.75')}
@@ -98,9 +98,9 @@ const Login = () => {
           >
             {/* Instagram SVG icon */}
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="2" width="20" height="20" rx="5" stroke="#c5a021" strokeWidth="2" />
-              <circle cx="12" cy="12" r="4" stroke="#c5a021" strokeWidth="2" />
-              <circle cx="17.5" cy="6.5" r="1.2" fill="#c5a021" />
+              <rect x="2" y="2" width="20" height="20" rx="5" stroke="#a2d149" strokeWidth="2" />
+              <circle cx="12" cy="12" r="4" stroke="#a2d149" strokeWidth="2" />
+              <circle cx="17.5" cy="6.5" r="1.2" fill="#a2d149" />
             </svg>
             @jefeandrea
           </a>
@@ -109,7 +109,7 @@ const Login = () => {
             href="tel:+571234567890"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              color: '#c5a021', textDecoration: 'none', fontSize: '13px', fontWeight: 600,
+              color: '#a2d149', textDecoration: 'none', fontSize: '13px', fontWeight: 600,
               transition: 'opacity 0.2s'
             }}
             onMouseOver={e => (e.currentTarget.style.opacity = '0.75')}
@@ -117,15 +117,15 @@ const Login = () => {
           >
             {/* Phone SVG icon */}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6.6 10.8C7.8 13.2 9.8 15.2 12.2 16.4L14 14.6C14.3 14.3 14.7 14.2 15 14.4C16.1 14.8 17.3 15 18.5 15C19.3 15 20 15.7 20 16.5V19.5C20 20.3 19.3 21 18.5 21C9.9 21 3 14.1 3 5.5C3 4.7 3.7 4 4.5 4H7.5C8.3 4 9 4.7 9 5.5C9 6.7 9.2 7.9 9.6 9C9.7 9.3 9.6 9.7 9.4 10L6.6 10.8Z" stroke="#c5a021" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M6.6 10.8C7.8 13.2 9.8 15.2 12.2 16.4L14 14.6C14.3 14.3 14.7 14.2 15 14.4C16.1 14.8 17.3 15 18.5 15C19.3 15 20 15.7 20 16.5V19.5C20 20.3 19.3 21 18.5 21C9.9 21 3 14.1 3 5.5C3 4.7 3.7 4 4.5 4H7.5C8.3 4 9 4.7 9 5.5C9 6.7 9.2 7.9 9.6 9C9.7 9.3 9.6 9.7 9.4 10L6.6 10.8Z" stroke="#a2d149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             +57 1234567890
           </a>
         </div>
       </div>
 
-      <div style={{ background: '#222', padding: 40, borderRadius: 20, textAlign: 'center', border: '1px solid #333', width: '100%', maxWidth: 380 }}>
-        <h3 style={{ marginBottom: 30, color: '#f0f0f0' }}>Iniciar Sesión / Acceder a tu Plan</h3>
+      <div style={{ background: '#fff', padding: 40, borderRadius: 20, textAlign: 'center', border: '1px solid #e0e7e1', width: '100%', maxWidth: 380, boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+        <h3 style={{ marginBottom: 30, color: '#2d4739' }}>Iniciar Sesión / Acceder a tu Plan</h3>
 
         <GoogleLogin
           onSuccess={handleSuccess}
@@ -133,7 +133,7 @@ const Login = () => {
             setErrorMsg('El inicio de sesión falló. Por favor, intenta de nuevo.');
           }}
           useOneTap
-          theme="filled_black"
+          theme="outline"
           shape="pill"
         />
 

@@ -5,6 +5,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 import os
 import time
+import uuid
 from google.cloud import bigquery
 from google.oauth2 import service_account
 from sqlalchemy.orm import Session
@@ -90,10 +91,8 @@ class UserStatusReq(BaseModel):
 class CoachCreate(BaseModel):
     name: str
     email: str
-
-class CoachCreate(BaseModel):
-    name: str
-    email: str
+    phone: Optional[str] = None
+    instagram: Optional[str] = None
 
 class RoutineReq(BaseModel):
     client_email: str
@@ -196,6 +195,9 @@ def get_clients(db: Session = Depends(get_db), current_user: models.User = Depen
 
 @app.post("/api/coach/clients")
 def save_client_profile(req: ClientDataReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    if current_user.role == "Coach" and not current_user.is_active:
+        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
+    
     user = db.query(models.User).filter(models.User.email == req.email).first()
     if not user:
         user = models.User(
@@ -250,6 +252,9 @@ def save_client_profile(req: ClientDataReq, db: Session = Depends(get_db), curre
 
 @app.put("/api/coach/clients/{user_id}")
 def update_client_profile(user_id: int, req: ClientDataReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    if current_user.role == "Coach" and not current_user.is_active:
+        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
+
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -297,6 +302,10 @@ def update_user_status(user_id: int, req: UserStatusReq, db: Session = Depends(g
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
+    # El Admin puede cambiar el estado de cualquiera. El Coach solo puede cambiar el de sus clientes.
+    if current_user.role == "Coach" and user.coach_id != current_user.id:
+         raise HTTPException(status_code=403, detail="No tiene permiso para cambiar el estado de este usuario")
+
     user.is_active = req.is_active
     db.commit()
     
@@ -337,6 +346,9 @@ def record_weight_history(db: Session, user_id: int, weight: str, routine_id: Op
 
 @app.post("/api/coach/routines")
 def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    if current_user.role == "Coach" and not current_user.is_active:
+        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
+
     start_time = time.time()
     client_user = db.query(models.User).filter(models.User.email == req.client_email).first()
     if not client_user:
@@ -376,11 +388,24 @@ def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session
 
 @app.post("/api/coach/publish-all")
 def publish_all(req: PublishAllReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    if current_user.role == "Coach" and not current_user.is_active:
+        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
+
     overall_start = time.time()
-    
+
+    def get_plan_price(plan_type: str):
+        prices = {
+            "Mensual": 20000,
+            "Dos Meses": 40000,
+            "Trimestral": 60000,
+            "Anual": 120000
+        }
+        return prices.get(plan_type, 20000)
+
     # 1. Actualizar Perfil (Lógica de save_client_profile integrada)
     user = db.query(models.User).filter(models.User.email == req.athlete.email).first()
-    if not user:
+    is_new_user = not user
+    if is_new_user:
         user = models.User(email=req.athlete.email, name=req.athlete.name, role="Client", coach_id=current_user.id if current_user.role == "Coach" else req.athlete.coach_id)
         db.add(user)
         db.commit()
@@ -411,11 +436,29 @@ def publish_all(req: PublishAllReq, background_tasks: BackgroundTasks, db: Sessi
         if profile.end_date >= today:
             user.is_active = True
 
-    # 2. Guardar Rutina (Lógica de save_routine integrada)
     new_routine = models.Routine(user_id=user.id, routine_data=req.routine_data)
     db.add(new_routine)
+
+    # 2.5 Gestión de Pago (Solo si es nuevo o renovación)
+    if is_new_user or req.athlete.isRenewal:
+        payment = models.Payment(
+            coach_id=current_user.id,
+            client_id=user.id,
+            client_name=user.name,
+            amount=get_plan_price(req.athlete.profile.planType),
+            plan_type=req.athlete.profile.planType,
+            status="Pending"
+        )
+        db.add(payment)
+
+    # 3. Notificación para el Atleta
+    notif = models.Notification(
+        user_id=user.id,
+        message=f"Tu coach {current_user.name} ha actualizado tu rutina."
+    )
+    db.add(notif)
     
-    # 3. Histórico de Peso
+    # 4. Histórico de Peso
     if profile.weight:
         record_weight_history(db, user.id, profile.weight, routine_id=None, notes="Actualización Global")
 
@@ -514,7 +557,7 @@ def get_weight_history(db: Session = Depends(get_db), current_user: models.User 
 def get_coaches(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
     # Solo el Admin debería poder ver y asignar coaches, pero permitimos el acceso para el dropdown
     coaches = db.query(models.User).filter(models.User.role == "Coach").all()
-    return [{"id": c.id, "name": c.name, "email": c.email} for c in coaches]
+    return [{"id": c.id, "name": c.name, "email": c.email, "phone": c.phone, "instagram": c.instagram} for c in coaches]
 
 # ====================
 # Admin Coach Management
@@ -526,16 +569,27 @@ def get_admin_coaches(db: Session = Depends(get_db), current_user: models.User =
 
 @app.post("/api/admin/coaches")
 def create_coach(req: CoachCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_admin)):
-    # Si el usuario ya existe, actualizamos su rol a Coach
+    # Si el usuario ya existe, actualizamos su rol a Coach y sus datos
     user = db.query(models.User).filter(models.User.email == req.email).first()
     if user:
         user.role = "Coach"
         user.name = req.name
+        user.phone = req.phone
+        user.instagram = req.instagram
+        # Si estaba inactivo, lo activamos por defecto al registrarlo como coach? 
+        # O mantenemos su estado? Por ahora lo mantenemos o forzamos True si es nuevo.
     else:
-        user = models.User(email=req.email, name=req.name, role="Coach", is_active=True)
+        user = models.User(
+            email=req.email, 
+            name=req.name, 
+            role="Coach", 
+            is_active=True,
+            phone=req.phone,
+            instagram=req.instagram
+        )
         db.add(user)
     db.commit()
-    return {"message": f"Coach {req.name} registrado correctamente"}
+    return {"message": f"Coach {req.name} procesado correctamente"}
 
 @app.delete("/api/admin/coaches/{coach_id}")
 def delete_coach(coach_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_admin)):
@@ -547,6 +601,100 @@ def delete_coach(coach_id: int, db: Session = Depends(get_db), current_user: mod
     coach.role = "Client"
     db.commit()
     return {"message": "Coach removido y convertido a cliente"}
+
+# ====================
+# NOTIFICACIONES
+# ====================
+@app.get("/api/notifications")
+def get_notifications(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    notifs = db.query(models.Notification)\
+        .filter(models.Notification.user_id == current_user.id)\
+        .order_by(models.Notification.created_at.desc())\
+        .all()
+    
+    return [
+        {
+            "id": n.id,
+            "message": n.message,
+            "date": n.created_at.strftime("%d/%m/%Y %H:%M"),
+            "is_read": n.is_read
+        } for n in notifs
+    ]
+
+@app.delete("/api/notifications/{notif_id}")
+def delete_notification(notif_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    notif = db.query(models.Notification).filter(models.Notification.id == notif_id, models.Notification.user_id == current_user.id).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notificación no encontrada")
+    
+    db.delete(notif)
+    db.commit()
+    return {"message": "Notificación eliminada"}
+
+# ====================
+# PAGOS (COACH -> ADMIN)
+# ====================
+@app.get("/api/coach/payments")
+def get_coach_payments(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    payments = db.query(models.Payment)\
+        .filter(models.Payment.coach_id == current_user.id)\
+        .order_by(models.Payment.created_at.desc())\
+        .all()
+    
+    return [
+        {
+            "id": p.id,
+            "client_name": p.client_name,
+            "amount": p.amount,
+            "plan_type": p.plan_type,
+            "status": p.status,
+            "date": p.created_at.strftime("%d/%m/%Y")
+        } for p in payments
+    ]
+
+@app.post("/api/coach/payments/pay")
+def pay_balance(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+    batch_id = str(uuid.uuid4())
+    db.query(models.Payment)\
+        .filter(models.Payment.coach_id == current_user.id, models.Payment.status == "Pending")\
+        .update({"status": "Paid", "batch_id": batch_id})
+    db.commit()
+    return {"message": "Saldo pagado exitosamente", "batch_id": batch_id}
+
+# ====================
+# ADMIN PAGOS
+# ====================
+@app.get("/api/admin/payments")
+def get_admin_payments(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_admin)):
+    payments = db.query(models.Payment).filter(models.Payment.status == "Paid").all()
+    batches = {}
+    for p in payments:
+        bid = p.batch_id or "legacy"
+        if bid not in batches:
+            coach = db.query(models.User).filter(models.User.id == p.coach_id).first()
+            batches[bid] = {
+                "batch_id": bid,
+                "coach_name": coach.name if coach else "Desconocido",
+                "coach_id": p.coach_id,
+                "date": p.created_at.strftime("%d/%m/%Y"),
+                "total_amount": 0,
+                "clients_count": 0,
+                "clients": []
+            }
+        batches[bid]["total_amount"] += p.amount
+        batches[bid]["clients_count"] += 1
+        
+        # Obtener detalles del cliente (perfil)
+        client = db.query(models.User).filter(models.User.id == p.client_id).first()
+        batches[bid]["clients"].append({
+            "name": p.client_name,
+            "plan_type": p.plan_type,
+            "amount": p.amount,
+            "start_date": client.profile.start_date if client and client.profile else "—",
+            "end_date": client.profile.end_date if client and client.profile else "—"
+        })
+    
+    return sorted(list(batches.values()), key=lambda x: x["date"], reverse=True)
 
 @app.get("/")
 def read_root():

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { EXERCISES_DB, getImageUrl, preloadImage } from '../data';
-import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft } from 'lucide-react';
+import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign } from 'lucide-react';
 import '../App.css';
+import logoBody2 from '../assets/logobody2.png';
 import ExerciseImage from '../components/ExerciseImage';
 
 interface ExerciseSubRow {
@@ -55,11 +56,15 @@ export interface CoachDashboardProps {
 
 const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) => {
   const { token, logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'create' | 'users'>(preloadedEmail ? 'create' : 'create');
+  const [activeTab, setActiveTab] = useState<'create' | 'users' | 'payments'>(preloadedEmail ? 'create' : 'create');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingEmail, setViewingEmail] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(propIsReadOnly || false);
   const [clients, setClients] = useState<AthleteData[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+
+  // Bloqueo de Coach Inactivo
+  const isCoachBlocked = user?.role === 'Coach' && !user.isActive;
 
   // Auth Headers Helper
   const authHeaders = {
@@ -168,6 +173,33 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
       }
     } catch (e) {
       console.error("Error fetching clients", e);
+    }
+  };
+
+  const fetchPayments = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/coach/payments', { headers: authHeaders });
+      if (res.ok) setPayments(await res.json());
+    } catch (e) { console.error("Error fetching payments", e); }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'payments') fetchPayments();
+  }, [activeTab]);
+
+  const handlePayBalance = async () => {
+    if (!window.confirm("¿Confirmas que has pagado el saldo pendiente al administrador?")) return;
+    try {
+      const res = await fetch('http://localhost:8000/api/coach/payments/pay', {
+        method: 'POST',
+        headers: authHeaders
+      });
+      if (res.ok) {
+        setStatusMsg({ type: 'success', text: 'Saldo marcado como pagado exitosamente' });
+        fetchPayments();
+      }
+    } catch (e) { 
+      setStatusMsg({ type: 'error', text: 'Error al procesar el pago' });
     }
   };
 
@@ -428,7 +460,13 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
           <option key={c.email} value={c.email}>{c.name}</option>
         ))}
       </datalist>
-      <div className="admin-container" style={{ position: 'relative' }}>
+      <div className="admin-container" style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* Background Watermark */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          backgroundImage: `url(${logoBody2})`, backgroundRepeat: 'repeat', backgroundSize: '220px',
+          opacity: 0.06, pointerEvents: 'none', zIndex: 0
+        }} />
 
         {!hideHeader && (
           <>
@@ -439,9 +477,10 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
               <LogOut size={16} /> Salir
             </button>
 
-            <div className="header">
+            <div className="header" style={{ position: 'relative', zIndex: 1 }}>
+              <img src={logoBody2} alt="Logo" style={{ width: 140, marginBottom: 20, filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.1))' }} />
               <h1>BODY LOGIC</h1>
-              <p style={{ margin: '-10px 0 10px 0', fontSize: '14px', fontWeight: 700, color: '#c5a021', textTransform: 'uppercase' }}>Resultados diseñados a tu medida</p>
+              <p style={{ margin: '-10px 0 10px 0', fontSize: '14px', fontWeight: 700, color: '#a2d149', textTransform: 'uppercase' }}>Resultados diseñados a tu medida</p>
               <p>CONTROL PANEL | Coach: {user?.name}</p>
             </div>
           </>
@@ -453,7 +492,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
             <button
               onClick={() => setActiveTab('create')}
               style={{
-                flex: 1, padding: '14px', background: activeTab === 'create' ? '#111' : '#fff', color: activeTab === 'create' ? '#fff' : '#111',
+                flex: 1, padding: '14px', background: activeTab === 'create' ? '#2d4739' : '#fff', color: activeTab === 'create' ? '#fff' : '#2d4739',
                 border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 boxShadow: activeTab === 'create' ? '0 8px 16px rgba(0,0,0,0.1)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
               }}>
@@ -462,16 +501,103 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
             <button
               onClick={() => setActiveTab('users')}
               style={{
-                flex: 1, padding: '14px', background: activeTab === 'users' ? '#c5a021' : '#fff', color: activeTab === 'users' ? '#fff' : '#111',
+                flex: 1, padding: '14px', background: activeTab === 'users' ? '#a2d149' : '#fff', color: activeTab === 'users' ? '#fff' : '#2d4739',
                 border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 boxShadow: activeTab === 'users' ? '0 8px 16px rgba(197,160,33,0.2)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
               }}>
               <Users size={16} /> VER USUARIOS
             </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              style={{
+                flex: 1, padding: '14px', background: activeTab === 'payments' ? '#3b82f6' : '#fff', color: activeTab === 'payments' ? '#fff' : '#2d4739',
+                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: activeTab === 'payments' ? '0 8px 16px rgba(59,130,246,0.2)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+              }}>
+              <DollarSign size={16} /> GESTIÓN DE PAGOS
+            </button>
           </div>
         )}
 
-        {activeTab === 'users' ? (
+        {isCoachBlocked && (
+          <div style={{
+            background: '#fee2e2', color: '#991b1b', padding: '15px 20px', borderRadius: 12, border: '1px solid #fecaca',
+            marginBottom: 25, display: 'flex', alignItems: 'center', gap: 12, fontWeight: 700, fontSize: 14, position: 'relative', zIndex: 1
+          }}>
+            <ShieldOff size={24} />
+            <div>
+              <p style={{ margin: 0 }}>CUENTA DE COACH INACTIVA</p>
+              <p style={{ margin: 0, fontWeight: 500, fontSize: 12 }}>Tu acceso a la gestión de clientes está restringido. Por favor, contacta al administrador.</p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'payments' ? (
+          <div style={{ padding: '0 0 20px 0' }}>
+            <h2 className="section-title">Control de Pago a Body Logic</h2>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 25, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 30 }}>
+                <div style={{ background: '#fee2e2', padding: 20, borderRadius: 12, border: '1px solid #fecaca' }}>
+                  <p style={{ margin: 0, fontSize: 12, color: '#ef4444', fontWeight: 800, textTransform: 'uppercase' }}>Saldo Pendiente</p>
+                  <p style={{ margin: '5px 0 0 0', fontSize: 24, fontWeight: 900, color: '#991b1b' }}>
+                    ${payments.filter(p => p.status === 'Pending').reduce((acc, p) => acc + p.amount, 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #f1f5f9', color: '#64748b', fontSize: '11px', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '12px 10px' }}>Fecha</th>
+                      <th style={{ padding: '12px 10px' }}>Atleta</th>
+                      <th style={{ padding: '12px 10px' }}>Plan</th>
+                      <th style={{ padding: '12px 10px' }}>Monto</th>
+                      <th style={{ padding: '12px 10px', textAlign: 'right' }}>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map(p => (
+                      <tr key={p.id} style={{ borderBottom: '1px solid #f8fafc' }}>
+                        <td style={{ padding: '15px 10px', fontSize: 12, color: '#64748b' }}>{p.date}</td>
+                        <td style={{ padding: '15px 10px', fontWeight: 700, fontSize: 14 }}>{p.client_name}</td>
+                        <td style={{ padding: '15px 10px' }}>
+                          <span style={{ fontSize: 12, fontWeight: 600 }}>{p.plan_type}</span>
+                        </td>
+                        <td style={{ padding: '15px 10px', fontWeight: 700, color: '#10b981' }}>
+                          ${p.amount.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '15px 10px', textAlign: 'right' }}>
+                          <span style={{
+                            padding: '4px 10px', borderRadius: 20, fontSize: '10px', fontWeight: 800,
+                            background: p.status === 'Paid' ? '#dcfce7' : '#fee2e2',
+                            color: p.status === 'Paid' ? '#166534' : '#991b1b'
+                          }}>
+                            {p.status === 'Paid' ? 'PAGADO' : 'PENDIENTE'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {payments.some(p => p.status === 'Pending') && (
+                <div style={{ marginTop: 30, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button 
+                    onClick={handlePayBalance}
+                    style={{
+                      background: '#2d4739', color: '#fff', border: 'none', padding: '15px 30px', 
+                      borderRadius: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    PAGAR SALDO PENDIENTE (${payments.filter(p => p.status === 'Pending').reduce((acc, p) => acc + p.amount, 0).toLocaleString()})
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : activeTab === 'users' ? (
           <div style={{ padding: '0 0 20px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 className="section-title" style={{ margin: 0 }}>Listado de Atletas</h2>
@@ -523,7 +649,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                         <button
                           onClick={() => handleViewRoutineFromList(c.email)}
                           style={{
-                            background: '#111', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6,
+                            background: '#2d4739', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6,
                             cursor: 'pointer', fontWeight: 700, fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: 6
                           }}>
                           <Eye size={14} /> Ver Rutina
@@ -541,7 +667,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
               <button
                 className="btn"
                 onClick={handleBackToList}
-                style={{ background: '#111', color: '#fff', marginBottom: 20, display: 'inline-flex', gap: 8, padding: '10px 20px' }}
+                style={{ background: '#2d4739', color: '#fff', marginBottom: 20, display: 'inline-flex', gap: 8, padding: '10px 20px' }}
               >
                 <ArrowLeft size={16} /> VOLVER AL LISTADO DE USUARIOS
               </button>
@@ -590,8 +716,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                     list="clients-datalist"
                     placeholder="Escribe email o nombre..."
                     value={athlete.email}
-                    disabled={isReadOnly}
-                    style={isReadOnly ? { ...lockedStyle, width: '100%' } : { border: '2px solid #c5a021', width: '100%', borderRadius: '8px', padding: '10px' }}
+                    disabled={isReadOnly || isCoachBlocked}
+                    style={(isReadOnly || isCoachBlocked) ? { ...lockedStyle, width: '100%' } : { border: '2px solid #a2d149', width: '100%', borderRadius: '8px', padding: '10px' }}
                     onChange={(e) => {
                       const val = e.target.value;
                       setAthlete({ ...athlete, email: val });
@@ -654,8 +780,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                   <select
                     value={athlete.coach_id || ""}
                     onChange={e => setAthlete({ ...athlete, coach_id: e.target.value ? parseInt(e.target.value) : null })}
-                    disabled={isReadOnly}
-                    style={isReadOnly ? lockedStyle : { border: '2px solid #c5a021', background: '#fff' }}
+                    disabled={isReadOnly || isCoachBlocked}
+                    style={(isReadOnly || isCoachBlocked) ? lockedStyle : { border: '2px solid #a2d149', background: '#fff' }}
                   >
                     <option value="">-- Seleccionar Coach --</option>
                     {coaches.map(c => (
@@ -670,8 +796,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <input
                   type="email"
                   value={athlete.email}
-                  disabled={isReadOnly || (isExistingClient && user?.role !== 'Admin')}
-                  style={(isReadOnly || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')}
+                  style={(isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
                   onChange={e => setAthlete({ ...athlete, email: e.target.value })}
                   placeholder="email@gmail.com"
                 />
@@ -681,8 +807,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <input
                   type="text"
                   value={athlete.name}
-                  disabled={isReadOnly || (isExistingClient && user?.role !== 'Admin')}
-                  style={(isReadOnly || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')}
+                  style={(isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
                   onChange={e => setAthlete({ ...athlete, name: e.target.value })}
                 />
               </div>
@@ -691,8 +817,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <input
                   type="number"
                   value={athlete.profile.age}
-                  disabled={isReadOnly}
-                  style={isReadOnly ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked}
+                  style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
                   onChange={e => {
                     const val = e.target.value;
                     if (val.length <= 2) setAthlete({ ...athlete, profile: { ...athlete.profile, age: val } });
@@ -704,8 +830,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <input
                   type="number"
                   value={athlete.profile.weight}
-                  disabled={isReadOnly}
-                  style={isReadOnly ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked}
+                  style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
                   onChange={e => {
                     const val = e.target.value;
                     if (val.length <= 3) setAthlete({ ...athlete, profile: { ...athlete.profile, weight: val } });
@@ -716,8 +842,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <label>Objetivo</label>
                 <select
                   value={athlete.profile.goal}
-                  disabled={isReadOnly}
-                  style={isReadOnly ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked}
+                  style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
                   onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, goal: e.target.value } })}
                 >
                   <option>Definición Muscular</option>
@@ -730,8 +856,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <label>Tipo de Plan</label>
                 <select
                   value={athlete.profile.planType}
-                  disabled={isReadOnly || isContractLocked}
-                  style={(isReadOnly || isContractLocked) ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked || isContractLocked}
+                  style={(isReadOnly || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
                   onChange={e => {
                     const newPlan = e.target.value;
                     let days = 30;
@@ -752,8 +878,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <input
                   type="date"
                   value={athlete.profile.startDate}
-                  disabled={isReadOnly || isContractLocked}
-                  style={(isReadOnly || isContractLocked) ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked || isContractLocked}
+                  style={(isReadOnly || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
                   onChange={e => {
                     const newStart = e.target.value;
                     const dControl = new Date(newStart + 'T12:00:00');
@@ -776,8 +902,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <input
                   type="date"
                   value={athlete.profile.endDate}
-                  disabled={isReadOnly || isContractLocked}
-                  style={(isReadOnly || isContractLocked) ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked || isContractLocked}
+                  style={(isReadOnly || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
                   onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, endDate: e.target.value } })}
                 />
               </div>
@@ -786,8 +912,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <input
                   type="date"
                   value={athlete.profile.controlDate}
-                  disabled={isReadOnly}
-                  style={isReadOnly ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked}
+                  style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
                   onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, controlDate: e.target.value } })}
                 />
               </div>
@@ -800,7 +926,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                   <input
                     type="checkbox"
                     checked={selectedDays.includes(day)}
-                    disabled={isReadOnly}
+                    disabled={isReadOnly || isCoachBlocked}
                     onChange={() => handleDayToggle(day)}
                   />
                   {day}
@@ -810,9 +936,9 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <button
                   className="btn btn-add-day main-add-btn"
                   onClick={renderDays}
-                  disabled={!athlete.is_active}
-                  style={!athlete.is_active ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
-                  title={!athlete.is_active ? "No se puede configurar rutina para atletas inactivos" : ""}
+                  disabled={!athlete.is_active || isCoachBlocked}
+                  style={(!athlete.is_active || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
+                  title={isCoachBlocked ? "Tu cuenta está inactiva" : (!athlete.is_active ? "No se puede configurar rutina para atletas inactivos" : "")}
                 >
                   Crear Días
                 </button>
@@ -824,13 +950,13 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 <div key={day.name} className="day-container">
                   <div className="day-header">
                     {day.name}
-                    {!isReadOnly && <button className="btn btn-add-day" onClick={() => addGroup(day.name)}>+ Bloque</button>}
+                    {!isReadOnly && <button className="btn btn-add-day" onClick={() => addGroup(day.name)} disabled={isCoachBlocked} style={isCoachBlocked ? lockedStyle : {}}>+ Bloque</button>}
                   </div>
 
                   <div className="day-groups">
                     {day.groups.map(group => (
                       <div key={group.id} className="exercise-group">
-                        {!isReadOnly && <button className="btn btn-del" onClick={() => removeGroup(day.name, group.id)}>Eliminar</button>}
+                        {!isReadOnly && <button className="btn btn-del" onClick={() => removeGroup(day.name, group.id)} disabled={isCoachBlocked} style={isCoachBlocked ? lockedStyle : {}}>Eliminar</button>}
 
                         <div className="rows-holder">
                           {group.exercises.map((ex, idx) => (
@@ -931,7 +1057,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                         </div>
 
                         {!isReadOnly && group.exercises.length < 2 && (
-                          <button className="btn btn-biserie" onClick={() => addBiserie(day.name, group.id)}>
+                          <button className="btn btn-biserie" onClick={() => addBiserie(day.name, group.id)} disabled={isCoachBlocked} style={isCoachBlocked ? lockedStyle : {}}>
                             + AGREGAR BISERIE
                           </button>
                         )}
@@ -949,11 +1075,11 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
               <button
                 className="btn btn-generate"
                 onClick={publishRoutine}
-                disabled={isLoading || !athlete.is_active}
-                style={!athlete.is_active ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
-                title={!athlete.is_active ? "No se puede publicar rutina para atletas inactivos" : ""}
+                disabled={isLoading || !athlete.is_active || isCoachBlocked}
+                style={(!athlete.is_active || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
+                title={isCoachBlocked ? "Tu cuenta está inactiva" : (!athlete.is_active ? "No se puede publicar rutina para atletas inactivos" : "")}
               >
-                {isLoading ? 'PUBLICANDO...' : (!athlete.is_active ? 'USUARIO INACTIVO' : 'PUBLICAR RUTINA')}
+                {isLoading ? 'PUBLICANDO...' : (isCoachBlocked ? 'ACCESO RESTRINGIDO' : (!athlete.is_active ? 'USUARIO INACTIVO' : 'PUBLICAR RUTINA'))}
               </button>
             )}
 
