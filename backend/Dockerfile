@@ -2,8 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies if required (e.g. for ffmpeg/bcrypt)
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+# No system dependencies required for production
 
 COPY requirements.txt .
 

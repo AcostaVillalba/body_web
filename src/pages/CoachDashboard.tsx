@@ -5,6 +5,7 @@ import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSig
 import '../App.css';
 import logoBody2 from '../assets/logobody2.png';
 import ExerciseImage from '../components/ExerciseImage';
+import API_URL from '../api';
 
 interface ExerciseSubRow {
   id: string;
@@ -80,7 +81,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/notifications', { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/notifications`, { headers: authHeaders });
       if (res.ok) {
         const dbNotifs = await res.json();
         setNotifications(dbNotifs);
@@ -140,7 +141,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
       return;
     }
     try {
-      await fetch(`http://localhost:8000/api/notifications/${id}/read`, { method: 'PATCH', headers: authHeaders });
+      await fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'PATCH', headers: authHeaders });
       fetchNotifications();
     } catch (e) { console.error(e); }
   };
@@ -151,7 +152,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8000/api/notifications/${id}`, { method: 'DELETE', headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/notifications/${id}`, { method: 'DELETE', headers: authHeaders });
       if (res.ok) fetchNotifications();
     } catch (e) { console.error(e); }
   };
@@ -210,7 +211,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
   const fetchCoaches = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/coach/list', { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/coach/list`, { headers: authHeaders });
       if (res.ok) setCoaches(await res.json());
     } catch (e) { console.error("Error fetching coaches", e); }
   };
@@ -228,14 +229,25 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
   useEffect(() => {
     if (preloadedRoutine && preloadedRoutine.length > 0) {
-      setRoutineDays(preloadedRoutine);
-      setSelectedDays(preloadedRoutine.map(d => d.name));
+      // Refrescar URLs de imágenes para asegurar que se usen los GIFs actuales
+      const refreshedRoutine = preloadedRoutine.map(day => ({
+        ...day,
+        groups: day.groups.map(group => ({
+          ...group,
+          exercises: group.exercises.map(ex => ({
+            ...ex,
+            img: getImageUrl(ex.name)
+          }))
+        }))
+      }));
+      setRoutineDays(refreshedRoutine);
+      setSelectedDays(refreshedRoutine.map(d => d.name));
     }
   }, [preloadedRoutine]);
 
   const fetchClients = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/coach/clients', { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/coach/clients`, { headers: authHeaders });
 
       if (res.status === 403) {
         const data = await res.json();
@@ -268,7 +280,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
   const fetchPayments = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/coach/payments', { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/coach/payments`, { headers: authHeaders });
       if (res.ok) setPayments(await res.json());
     } catch (e) { console.error("Error fetching payments", e); }
   };
@@ -280,7 +292,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
   const handlePayBalance = async () => {
     if (!window.confirm("¿Confirmas que has pagado el saldo pendiente al administrador?")) return;
     try {
-      const res = await fetch('http://localhost:8000/api/coach/payments/pay', {
+      const res = await fetch(`${API_URL}/api/coach/payments/pay`, {
         method: 'POST',
         headers: authHeaders
       });
@@ -319,13 +331,26 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
     setViewingEmail(clientEmail);
     setIsReadOnly(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/coach/routine/${clientEmail}`, { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/coach/routine/${clientEmail}`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'success' && data.routine_data) {
-          const routine = JSON.parse(data.routine_data);
-          setRoutineDays(routine);
-          setSelectedDays(routine.map((d: any) => d.name));
+          const routine: RoutineDay[] = JSON.parse(data.routine_data);
+          
+          // Refrescar URLs de imágenes para asegurar que se usen los GIFs actuales
+          const updatedRoutine = routine.map(day => ({
+            ...day,
+            groups: day.groups.map(group => ({
+              ...group,
+              exercises: group.exercises.map(ex => ({
+                ...ex,
+                img: getImageUrl(ex.name) // Forzar actualización desde data.ts
+              }))
+            }))
+          }));
+
+          setRoutineDays(updatedRoutine);
+          setSelectedDays(updatedRoutine.map((d: any) => d.name));
         } else {
           setRoutineDays([]);
           setSelectedDays([]);
@@ -356,7 +381,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
     setIsLoading(true);
     setStatusMsg({ type: '', text: '' });
     try {
-      const res = await fetch('http://localhost:8000/api/coach/clients', {
+      const res = await fetch(`${API_URL}/api/coach/clients`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ ...athlete, isRenewal: true })
@@ -516,7 +541,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
     try {
       // Unificamos el guardado de perfil y rutina en una sola petición atómica
-      const res = await fetch('http://localhost:8000/api/coach/publish-all', {
+      const res = await fetch(`${API_URL}/api/coach/publish-all`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({

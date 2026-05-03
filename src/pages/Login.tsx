@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import logoBody2 from '../assets/logobody2.png';
 import '../App.css';
 
+import API_URL from '../api';
+
 const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -24,7 +26,7 @@ const Login = () => {
       if (!token) throw new Error("No token received");
 
       // Verify token with backend
-      const res = await fetch('http://localhost:8000/api/auth/google', {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })

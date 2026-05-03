@@ -37,14 +37,14 @@ The backend is containerized using Docker and deployed to **Google Cloud Run**. 
    ```bash
    cd backend
 
-   gcloud run deploy body-web-backend \
-     --source . \
-     --region us-central1 \
-     --allow-unauthenticated \
-     --min-instances 0 \
-     --max-instances 1 \
-     --memory 256Mi \
-     --cpu 1 \
+   gcloud run deploy body-web-backend `
+     --source . `
+     --region us-central1 `
+     --allow-unauthenticated `
+     --min-instances 0 `
+     --max-instances 1 `
+     --memory 256Mi `
+     --cpu 1 `
      --concurrency 50
    ```
 

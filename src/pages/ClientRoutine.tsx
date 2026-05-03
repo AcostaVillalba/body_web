@@ -4,6 +4,7 @@ import { LogOut, ChevronDown, ChevronUp, History, X, Bell } from 'lucide-react';
 import logoBody2 from '../assets/logobody2.png';
 import { EXERCISES_DB, getImageUrl } from '../data';
 import ExerciseImage from '../components/ExerciseImage';
+import API_URL from '../api';
 
 const ClientRoutine = () => {
     const { user, token, logout } = useAuth();
@@ -24,7 +25,7 @@ const ClientRoutine = () => {
     useEffect(() => {
         const fetchRoutine = async () => {
             try {
-                const res = await fetch('http://localhost:8000/api/client/my-routine', {
+                const res = await fetch(`${API_URL}/api/client/my-routine`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -63,7 +64,7 @@ const ClientRoutine = () => {
         const fetchHistory = async () => {
             if (!token) return;
             try {
-                const res = await fetch('http://localhost:8000/api/client/weight-history', {
+                const res = await fetch(`${API_URL}/api/client/weight-history`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.ok) {
@@ -82,7 +83,7 @@ const ClientRoutine = () => {
         const fetchNotifs = async () => {
             if (!token) return;
             try {
-                const res = await fetch('http://localhost:8000/api/notifications', {
+                const res = await fetch(`${API_URL}/api/notifications`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.ok) {
@@ -104,7 +105,7 @@ const ClientRoutine = () => {
 
     const deleteNotif = async (id: number) => {
         try {
-            const res = await fetch(`http://localhost:8000/api/notifications/${id}`, {
+            const res = await fetch(`${API_URL}/api/notifications/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -856,7 +857,7 @@ const ClientRoutine = () => {
                         {/* Instagram */}
                         {coach?.instagram && (
                             <a
-                                href={`https://www.instagram.com/${coach.instagram.replace('@', '')}`}
+                                href={`https://www.instagram.com/${String(coach.instagram).replace('@', '')}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{
@@ -880,7 +881,7 @@ const ClientRoutine = () => {
                         {/* Phone */}
                         {coach?.phone && (
                             <a
-                                href={`https://wa.me/${coach.phone.replace(/[^0-9]/g, '')}`}
+                                href={`https://wa.me/${String(coach.phone).replace(/[^0-9]/g, '')}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{

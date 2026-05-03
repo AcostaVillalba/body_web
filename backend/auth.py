@@ -5,9 +5,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from sqlalchemy.orm import Session
-from database import get_db
-import models
 
 # In a real app, you would load these from a .env file
 SECRET_KEY = os.getenv("SECRET_KEY", "SUPER_SECRET_BODYLOGIC_KEY_CHANGE_ME")
@@ -46,7 +43,11 @@ def verify_google_token(token: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+from database_bq import get_bq_db
+
+# ... (código previo)
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -60,9 +61,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
     
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
+    db = get_bq_db()
+    user_dict = db.get_user_by_email(email)
+    if user_dict is None:
         raise credentials_exception
+    
+    # Convert dict to an object-like structure if needed, or just use dict
+    # FastAPI usually expects an object, but we can pass a Bunch/SimpleNamespace
+    from types import SimpleNamespace
+    user = SimpleNamespace(**user_dict)
     
     # El bloqueo de "plan expirado" solo aplica a Clientes. 
     # Admins y Coaches siempre deben poder entrar.
@@ -74,12 +81,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         
     return user
 
-async def get_current_active_coach(current_user: models.User = Depends(get_current_user)):
+async def get_current_active_coach(current_user: any = Depends(get_current_user)):
     if current_user.role not in ["Coach", "Admin"]:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     return current_user
 
-async def get_current_active_admin(current_user: models.User = Depends(get_current_user)):
+async def get_current_active_admin(current_user: any = Depends(get_current_user)):
     if current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     return current_user
