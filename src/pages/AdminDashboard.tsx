@@ -4,6 +4,8 @@ import { LogOut, Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, Sh
 import CoachDashboard, { type RoutineDay } from './CoachDashboard';
 import '../App.css';
 import logoBody2 from '../assets/logobody2.png';
+import API_URL from '../api';
+import { getImageUrl } from '../data';
 
 const AdminDashboard = () => {
   const { token, logout, user } = useAuth();
@@ -60,17 +62,23 @@ const AdminDashboard = () => {
 
   const fetchAdminPayments = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/payments', { headers: authHeaders });
-      if (res.ok) setAdminPayments(await res.json());
-    } catch (e) { console.error("Error fetching admin payments", e); }
+      console.log("DEBUG: Fetching admin payments from", `${API_URL}/api/admin/payments`);
+      const res = await fetch(`${API_URL}/api/admin/payments`, { headers: authHeaders });
+      console.log("DEBUG: Response status (payments):", res.status);
+      if (res.ok) {
+        const data = await res.json();
+        console.log("DEBUG: Payments data received:", data);
+        setAdminPayments(data);
+      }
+    } catch (e) { console.error("DEBUG: Error fetching admin payments", e); }
   };
 
   const fetchCoaches = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/coach/list', { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/coach/list`, { headers: authHeaders });
       if (res.ok) setCoaches(await res.json());
 
-      const resAdmin = await fetch('http://localhost:8000/api/admin/coaches', { headers: authHeaders });
+      const resAdmin = await fetch(`${API_URL}/api/admin/coaches`, { headers: authHeaders });
       if (resAdmin.ok) setCoachesList(await resAdmin.json());
     } catch (e) { console.error("Error fetching coaches", e); }
   };
@@ -78,7 +86,7 @@ const AdminDashboard = () => {
   const handleCreateCoach = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/api/admin/coaches', {
+      const res = await fetch(`${API_URL}/api/admin/coaches`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify(newCoach)
@@ -97,7 +105,7 @@ const AdminDashboard = () => {
 
   const handleToggleCoachStatus = async (coachId: number, currentStatus: boolean) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/users/${coachId}/status`, {
+      const res = await fetch(`${API_URL}/api/admin/users/${coachId}/status`, {
         method: 'PATCH',
         headers: authHeaders,
         body: JSON.stringify({ is_active: !currentStatus })
@@ -124,7 +132,7 @@ const AdminDashboard = () => {
   const handleDeleteCoach = async (id: number) => {
     if (!confirm("¿Estás seguro de remover a este coach? Se convertirá en cliente regular.")) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/coaches/${id}`, {
+      const res = await fetch(`${API_URL}/api/admin/coaches/${id}`, {
         method: 'DELETE',
         headers: authHeaders
       });
@@ -134,34 +142,31 @@ const AdminDashboard = () => {
 
   const fetchClients = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/coach/clients', { headers: authHeaders });
-
+      console.log("DEBUG: Fetching clients from", `${API_URL}/api/coach/clients`);
+      const res = await fetch(`${API_URL}/api/coach/clients`, { headers: authHeaders });
+      console.log("DEBUG: Response status (clients):", res.status);
+      
       if (res.status === 401) {
-        // Sesión inválida o expirada — limpiar y redirigir al login
+        console.warn("DEBUG: 401 Unauthorized - Redirecting to logout");
         logout();
         return;
       }
 
-      if (res.status === 403) {
-        const data = await res.json();
-        if (data.detail && String(data.detail).toLowerCase().includes("plan ha expirado")) {
-          logout();
-          return;
-        }
-      }
-
       if (res.ok) {
         const data = await res.json();
+        console.log("DEBUG: Clients data received:", data);
         setClients(data);
+      } else {
+        console.error("DEBUG: Request failed with status", res.status);
       }
     } catch (e) {
-      console.error("Error fetching clients", e);
+      console.error("DEBUG: Fetch error (CORS or Network):", e);
     }
   };
 
   const handleToggleStatus = async (userId: number, currentStatus: boolean) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/admin/users/${userId}/status`, {
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/status`, {
         method: 'PATCH',
         headers: authHeaders,
         body: JSON.stringify({ is_active: !currentStatus })
@@ -190,7 +195,7 @@ const AdminDashboard = () => {
     e.preventDefault();
     setStatusMsg({ text: 'Guardando...', type: 'info' });
     try {
-      const res = await fetch(`http://localhost:8000/api/coach/clients/${editingProfile.id}`, {
+      const res = await fetch(`${API_URL}/api/coach/clients/${editingProfile.id}`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify({
@@ -218,11 +223,25 @@ const AdminDashboard = () => {
     setIsLoading(true);
     setEditingClientEmail(email);
     try {
-      const res = await fetch(`http://localhost:8000/api/coach/routine/${email}`, { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/coach/routine/${email}`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'success' && data.routine_data) {
-          setEditingRoutine(JSON.parse(data.routine_data));
+          const routine: RoutineDay[] = JSON.parse(data.routine_data);
+          
+          // Refrescar URLs de imágenes para asegurar que se usen los GIFs actuales
+          const updatedRoutine = routine.map(day => ({
+            ...day,
+            groups: day.groups.map(group => ({
+              ...group,
+              exercises: group.exercises.map(ex => ({
+                ...ex,
+                img: getImageUrl(ex.name) // Forzar actualización desde data.ts
+              }))
+            }))
+          }));
+
+          setEditingRoutine(updatedRoutine);
         } else {
           setEditingRoutine([]); // Empty routine
         }

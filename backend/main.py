@@ -1,87 +1,47 @@
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union, Any
 from datetime import datetime, timedelta, timezone
 import os
-import time
 import uuid
-from google.cloud import bigquery
-from google.oauth2 import service_account
-from sqlalchemy.orm import Session
-
-# Colombia = UTC-5 (sin horario de verano)
-BOGOTA_TZ = timezone(timedelta(hours=-5))
-
-def now_bogota() -> datetime:
-    """Retorna la fecha/hora actual en zona horaria de Colombia (UTC-5)."""
-    return datetime.now(tz=BOGOTA_TZ)
-
-# Database and Auth imports
-from database import engine, get_db
-import models
+import time
+from database_bq import get_bq_db, now_bogota
 import auth
 
-# Create DB Tables
-models.Base.metadata.create_all(bind=engine)
-
-app = FastAPI(title="Body Logic Internal Server")
+app = FastAPI(title="Body Logic BigQuery Server")
 
 # Configuración de CORS
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://body-web-491923.web.app",
+    "https://body-web-491923.firebaseapp.com",
+    "https://bodylogic.fit",
+    "https://www.bodylogic.fit",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+    expose_headers=["Content-Length"],
 )
-
-# Configuración de BigQuery (Mantenida como respaldo analítico)
-PROJECT_ID = "body-web-491923"
-DATASET_ID = "bodybyja_analytics"
-TABLE_ID = "client_plans"
-CREDENTIALS_PATH = os.path.join(os.path.dirname(__file__), "secrets", "credentials.json")
-
-_bq_client = None
-def get_bigquery_client():
-    global _bq_client
-    if _bq_client:
-        return _bq_client
-    
-    if os.path.exists(CREDENTIALS_PATH):
-        try:
-            credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_PATH)
-            _bq_client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
-            return _bq_client
-        except Exception as e:
-            print(f"Error initializing BigQuery client: {e}")
-    return None
-
-def write_to_bigquery(data: dict):
-    client = get_bigquery_client()
-    if not client:
-        return
-    table_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
-    data["timestamp"] = now_bogota().isoformat()
-    errors = client.insert_rows_json(table_id, [data])
-    if errors:
-        print(f"Error insertando en BigQuery: {errors}")
-    else:
-        print("Datos insertados en BigQuery correctamente.")
 
 # Pydantic Schemas
 class TokenReq(BaseModel):
     token: str
 
 class ClientProfileBase(BaseModel):
-    age: str
-    weight: str
+    age: Any
+    weight: Any
     goal: str
     planType: str
     startDate: str
     endDate: str
     controlDate: str
-
     isRenewal: Optional[bool] = False
     coach_id: Optional[int] = None
 
@@ -96,7 +56,7 @@ class CoachCreate(BaseModel):
 
 class RoutineReq(BaseModel):
     client_email: str
-    routine_data: str # JSON string of the whole routine
+    routine_data: str
 
 class ClientDataReq(BaseModel):
     email: str
@@ -113,13 +73,13 @@ class PublishAllReq(BaseModel):
 # Auth Endpoints
 # ====================
 @app.post("/api/auth/google")
-def google_auth(req: TokenReq, db: Session = Depends(get_db)):
+def google_auth(req: TokenReq):
     idinfo = auth.verify_google_token(req.token)
     email = idinfo.get("email")
     name = idinfo.get("name")
-    print(f"AUTH_LOG: Intentando login para {email} ({name})")
     
-    user = db.query(models.User).filter(models.User.email == email).first()
+    db = get_bq_db()
+    user = db.get_user_by_email(email)
     
     admin_emails = ["acostavi1204@gmail.com"]
     coach_emails = ["bodybyja2026@gmail.com"]
@@ -131,620 +91,235 @@ def google_auth(req: TokenReq, db: Session = Depends(get_db)):
         expected_role = "Coach"
 
     if not user:
-        user = models.User(email=email, name=name, role=expected_role, google_id=idinfo.get("sub"))
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        user = db.create_user(email, name, expected_role, google_id=idinfo.get("sub"))
     else:
-        # Si el correo está en las listas blancas, lo subimos de nivel
-        if user.role != expected_role and expected_role != "Client":
-            user.role = expected_role
-            db.commit()
-            db.refresh(user)
-        
-        # ELIMINADO: La lógica que bajaba a Client si no estaba en la lista blanca.
-        # Ahora, si ya eres Coach en la DB, te quedas como Coach.
+        if user['role'] != expected_role and expected_role != "Client":
+            # Update role logic could be added here if needed
+            pass
 
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": user.email, "role": user.role}, expires_delta=access_token_expires
+        data={"sub": user['email'], "role": user['role']}, expires_delta=access_token_expires
     )
     
-    print(f"AUTH_LOG: Login exitoso para {user.email}. Rol: {user.role}, Active: {user.is_active}")
-    return {"access_token": access_token, "token_type": "bearer", "role": user.role, "name": user.name, "email": user.email, "is_active": bool(user.is_active)}
-
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "role": user['role'], 
+        "name": user['name'], 
+        "email": user['email'], 
+        "is_active": bool(user['is_active'])
+    }
 
 # ====================
 # Coach Endpoints
 # ====================
 @app.get("/api/coach/clients")
-def get_clients(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    query = db.query(models.User).filter(models.User.role == "Client")
+def get_clients(current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    is_admin = current_user.role == "Admin"
+    users = db.get_clients(coach_id=current_user.id, is_admin=is_admin)
     
-    # Si es Coach, solo ve sus clientes. Si es Admin, ve todos.
-    if current_user.role == "Coach":
-        query = query.filter(models.User.coach_id == current_user.id)
-        
-    users = query.all()
-    results = []
+    # Eliminar duplicados si los hubiera
+    seen_ids = set()
+    unique_users = []
     for u in users:
-        prof = u.profile
-        is_active = bool(u.is_active)
-        if prof and prof.end_date:
-            today = now_bogota().strftime("%Y-%m-%d")
-            if prof.end_date < today:
-                is_active = False
+        if u['id'] not in seen_ids:
+            unique_users.append(u)
+            seen_ids.add(u['id'])
+
+    results = []
+    today = now_bogota().strftime("%Y-%m-%d")
+    for u in unique_users:
+        is_active = bool(u['is_active'])
+        
+        # Asegurar que end_date sea string para la comparación
+        end_date_str = u['end_date']
+        if hasattr(end_date_str, 'strftime'):
+            end_date_str = end_date_str.strftime("%Y-%m-%d")
+
+        if end_date_str and end_date_str < today:
+            is_active = False
 
         results.append({
-            "id": u.id,
-            "email": u.email,
-            "name": u.name,
+            "id": u['id'],
+            "email": u['email'],
+            "name": u['name'],
             "profile": {
-                "age": prof.age if prof else "",
-                "weight": prof.weight if prof else "",
-                "goal": prof.goal if prof else "",
-                "planType": prof.plan_type if prof else "Mensual",
-                "startDate": prof.start_date if prof else "",
-                "endDate": prof.end_date if prof else "",
-                "controlDate": prof.control_date if prof else ""
+                "age": u['age'] or "",
+                "weight": u['weight'] or "",
+                "goal": u['goal'] or "",
+                "planType": u['plan_type'] or "Mensual",
+                "startDate": u['start_date'] or "",
+                "endDate": u['end_date'] or "",
+                "controlDate": u['control_date'] or ""
             },
             "is_active": is_active,
-            "coach_id": u.coach_id
+            "coach_id": u['coach_id']
         })
     return results
 
 @app.post("/api/coach/clients")
-def save_client_profile(req: ClientDataReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    if current_user.role == "Coach" and not current_user.is_active:
-        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
+def save_client_profile(req: ClientDataReq, current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    user = db.get_user_by_email(req.email)
     
-    user = db.query(models.User).filter(models.User.email == req.email).first()
     if not user:
-        user = models.User(
-            email=req.email, 
-            name=req.name, 
-            role="Client", 
-            coach_id=req.coach_id if req.coach_id else (current_user.id if current_user.role == "Coach" else None)
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    else:
-        user.name = req.name
-        # Si el usuario ya existía y el Admin/Coach envía un nuevo coach_id, lo actualizamos
-        if req.coach_id:
-            user.coach_id = req.coach_id
-        elif not user.coach_id and current_user.role == "Coach":
-            # Si el usuario no tiene coach y lo está registrando un coach, se lo asignamos a él
-            user.coach_id = current_user.id
-            
-        db.commit()
-
-    profile = db.query(models.ClientProfile).filter(models.ClientProfile.user_id == user.id).first()
-    is_new_profile = False
-    if not profile:
-        profile = models.ClientProfile(user_id=user.id)
-        db.add(profile)
-        is_new_profile = True
+        coach_id = req.coach_id if req.coach_id else (current_user.id if current_user.role == "Coach" else None)
+        user = db.create_user(req.email, req.name, "Client", coach_id=coach_id)
     
-    profile.age = req.profile.age
-    profile.weight = req.profile.weight
-    profile.goal = req.profile.goal
-    profile.control_date = req.profile.controlDate
+    db.save_client_profile(user['id'], req.profile.dict())
+    
+    if req.isRenewal:
+        db.create_payment(current_user.id, user['id'], user['name'], 20000, req.profile.planType)
 
-    if is_new_profile or req.isRenewal:
-        profile.plan_type = req.profile.planType
-        profile.start_date = req.profile.startDate
-        profile.end_date = req.profile.endDate
-        
-        # Activar usuario inmediatamente al registrar/renovar
-        today = now_bogota().strftime("%Y-%m-%d")
-        if profile.end_date >= today:
-            user.is_active = True
-            
-        # Gestión de Pago (Solo si es nuevo o renovación)
-        payment = models.Payment(
-            coach_id=current_user.id,
-            client_id=user.id,
-            client_name=user.name,
-            amount=get_plan_price(req.profile.planType),
-            plan_type=req.profile.planType,
-            status="Pending"
-        )
-        db.add(payment)
-
-    db.commit()
-
-    # Registrar en histórico SOLO si es un nuevo atleta o si no hay registros previos
-    if is_new_profile:
-        record_weight_history(db, user.id, req.profile.weight, notes="Registro inicial del atleta")
-
-    return {"status": "success", "message": "Atleta registrado en DB", "user_id": user.id}
+    return {"status": "success", "message": "Atleta registrado en BigQuery", "user_id": user['id']}
 
 @app.put("/api/coach/clients/{user_id}")
-def update_client_profile(user_id: int, req: ClientDataReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    if current_user.role == "Coach" and not current_user.is_active:
-        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
-
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        
-    # Check if the new email already exists in ANOTHER user
-    new_email = req.email.strip()
-    existing = db.query(models.User).filter(models.User.email == new_email, models.User.id != user_id).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Este correo ya está siendo usado por otro atleta.")
-        
-    user.email = new_email
-    user.name = req.name.strip()
-    if req.coach_id:
-        user.coach_id = req.coach_id
-    db.commit()
-    
-    profile = db.query(models.ClientProfile).filter(models.ClientProfile.user_id == user.id).first()
-    if profile:
-        start_time = time.time()
-        profile.age = req.profile.age
-        profile.weight = req.profile.weight
-        profile.goal = req.profile.goal
-        profile.control_date = req.profile.controlDate
-        
-        if req.isRenewal:
-            profile.plan_type = req.profile.planType
-            profile.start_date = req.profile.startDate
-            profile.end_date = req.profile.endDate
-            
-            # Activar usuario inmediatamente al registrar/renovar
-            today = now_bogota().strftime("%Y-%m-%d")
-            if profile.end_date >= today:
-                user.is_active = True
-
-            # Gestión de Pago por Renovación
-            payment = models.Payment(
-                coach_id=current_user.id,
-                client_id=user.id,
-                client_name=user.name,
-                amount=get_plan_price(req.profile.planType),
-                plan_type=req.profile.planType,
-                status="Pending"
-            )
-            db.add(payment)
-            
-        db.commit()
-        print(f"PERF: save_client_profile DB commit took {time.time() - start_time:.4f}s")
-
-        # No se registra peso aquí, se deja para cuando se publique una rutina (según instrucción del usuario)
-
-    return {"status": "success", "message": "Atleta actualizado correctamente", "user_id": user.id}
+def update_client_profile(user_id: int, req: ClientDataReq, current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    db.save_client_profile(user_id, req.profile.dict())
+    if req.isRenewal:
+        db.create_payment(current_user.id, user_id, req.name, 20000, req.profile.planType)
+    return {"status": "success", "message": "Atleta actualizado correctamente"}
 
 @app.patch("/api/admin/users/{user_id}/status")
-def update_user_status(user_id: int, req: UserStatusReq, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        
-    # El Admin puede cambiar el estado de cualquiera. El Coach solo puede cambiar el de sus clientes.
-    if current_user.role == "Coach" and user.coach_id != current_user.id:
-         raise HTTPException(status_code=403, detail="No tiene permiso para cambiar el estado de este usuario")
-
-    user.is_active = req.is_active
-    db.commit()
-    
-    return {"status": "success", "message": "Estado de usuario actualizado", "is_active": bool(user.is_active)}
-
-def record_weight_history(db: Session, user_id: int, weight: str, routine_id: Optional[int] = None, notes: Optional[str] = None):
-    # Solo registrar si hay peso
-    if not weight:
-        return
-    
-    # Deduplicación: Si existe un registro idéntico en los últimos 2 minutos, lo aprovechamos
-    two_min_ago = datetime.now() - timedelta(minutes=2)
-    recent = db.query(models.WeightHistory).filter(
-        models.WeightHistory.user_id == user_id,
-        models.WeightHistory.created_at >= two_min_ago,
-        models.WeightHistory.weight == weight
-    ).order_by(models.WeightHistory.created_at.desc()).first()
-
-    if recent:
-        # Si recibimos datos de rutina, lo asociamos al registro existente
-        if routine_id:
-            recent.routine_id = routine_id
-        # Si el nuevo registro es de "Rutina" y el anterior era de "Perfil", actualizamos la nota
-        # Pero si el anterior era "Registro inicial", mantenemos esa nota que es más importante.
-        if notes and "Rutina" in notes and "inicial" not in (recent.notes or ""):
-            recent.notes = notes
-        db.commit()
-        return
-    
-    new_entry = models.WeightHistory(
-        user_id=user_id,
-        weight=weight,
-        routine_id=routine_id,
-        notes=notes
-    )
-    db.add(new_entry)
-    db.commit()
-
-@app.post("/api/coach/routines")
-def save_routine(req: RoutineReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    if current_user.role == "Coach" and not current_user.is_active:
-        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
-
-    start_time = time.time()
-    client_user = db.query(models.User).filter(models.User.email == req.client_email).first()
-    if not client_user:
-        raise HTTPException(status_code=404, detail="Client not found. Register client profile first.")
-
-    # Guardar en SQLite
-    new_routine = models.Routine(user_id=client_user.id, routine_data=req.routine_data)
-    db.add(new_routine)
-    db.commit()
-    db.refresh(new_routine)
-    print(f"PERF: save_routine DB write took {time.time() - start_time:.4f}s")
-
-    # Registrar peso en histórico asociado a esta rutina
-    prof = client_user.profile
-    if prof and prof.weight:
-        weight_start = time.time()
-        record_weight_history(db, client_user.id, prof.weight, routine_id=new_routine.id, notes="Actualización de Rutina")
-        print(f"PERF: record_weight_history took {time.time() - weight_start:.4f}s")
-
-    # Preparar datos analíticos para BigQuery
-    bq_start = time.time()
-    prof = client_user.profile
-    bq_data = {
-        "name": client_user.name,
-        "id": getattr(client_user, 'id', ""),
-        "goal": prof.goal if prof else "",
-        "weight": prof.weight if prof else "",
-        "planType": prof.plan_type if prof else "",
-        "startDate": prof.start_date if prof else "",
-        "endDate": prof.end_date if prof else "",
-        "controlDate": prof.control_date if prof else ""
-    }
-    background_tasks.add_task(write_to_bigquery, bq_data.copy())
-    print(f"PERF: BigQuery background task queueing took {time.time() - bq_start:.4f}s")
-
-    return {"status": "success", "message": "Routine published and backed up to BigQuery"}
-
-def get_plan_price(plan_type: str):
-    prices = {
-        "Mensual": 20000,
-        "Dos meses": 40000,
-        "Trimestral": 60000
-    }
-    return prices.get(plan_type, 20000)
+def update_user_status(user_id: int, req: UserStatusReq, current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    db.update_user_status(user_id, req.is_active)
+    return {"status": "success", "is_active": req.is_active}
 
 @app.post("/api/coach/publish-all")
-def publish_all(req: PublishAllReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    if current_user.role == "Coach" and not current_user.is_active:
-        raise HTTPException(status_code=403, detail="Su cuenta de coach está inactiva. Contacte al administrador.")
-
-    overall_start = time.time()
-
-    # 1. Actualizar Perfil (Lógica de save_client_profile integrada)
-    user = db.query(models.User).filter(models.User.email == req.athlete.email).first()
-    is_new_user = not user
-    if is_new_user:
-        user = models.User(email=req.athlete.email, name=req.athlete.name, role="Client", coach_id=current_user.id if current_user.role == "Coach" else req.athlete.coach_id)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        profile = models.ClientProfile(user_id=user.id)
-        db.add(profile)
-    else:
-        user.name = req.athlete.name
-        if req.athlete.coach_id:
-            user.coach_id = req.athlete.coach_id
-        elif not user.coach_id and current_user.role == "Coach":
-            user.coach_id = current_user.id
-        profile = user.profile
-        if not profile:
-            profile = models.ClientProfile(user_id=user.id)
-            db.add(profile)
-
-    profile.age = req.athlete.profile.age
-    profile.weight = req.athlete.profile.weight
-    profile.goal = req.athlete.profile.goal
-    profile.control_date = req.athlete.profile.controlDate
+def publish_all(req: PublishAllReq, current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    user = db.get_user_by_email(req.athlete.email)
+    if not user:
+        user = db.create_user(req.athlete.email, req.athlete.name, "Client", coach_id=current_user.id)
     
+    db.save_client_profile(user['id'], req.athlete.profile.dict())
+    db.save_routine(user['id'], req.routine_data)
+    db.create_notification(user['id'], f"Tu coach {current_user.name} ha actualizado tu rutina.")
+    db.add_weight_record(user['id'], req.athlete.profile.weight, notes="Actualización Global")
+
     if req.athlete.isRenewal:
-        profile.plan_type = req.athlete.profile.planType
-        profile.start_date = req.athlete.profile.startDate
-        profile.end_date = req.athlete.profile.endDate
-        # Activar usuario inmediatamente al registrar/renovar
-        today = now_bogota().strftime("%Y-%m-%d")
-        if profile.end_date >= today:
-            user.is_active = True
+        db.create_payment(current_user.id, user['id'], user['name'], 20000, req.athlete.profile.planType)
 
-    new_routine = models.Routine(user_id=user.id, routine_data=req.routine_data)
-    db.add(new_routine)
-
-    # 2.5 Gestión de Pago (Solo si es nuevo o renovación)
-    if is_new_user or req.athlete.isRenewal:
-        payment = models.Payment(
-            coach_id=current_user.id,
-            client_id=user.id,
-            client_name=user.name,
-            amount=get_plan_price(req.athlete.profile.planType),
-            plan_type=req.athlete.profile.planType,
-            status="Pending"
-        )
-        db.add(payment)
-
-    # 3. Notificación para el Atleta
-    notif = models.Notification(
-        user_id=user.id,
-        message=f"Tu coach {current_user.name} ha actualizado tu rutina."
-    )
-    db.add(notif)
-    
-    # 4. Histórico de Peso
-    if profile.weight:
-        record_weight_history(db, user.id, profile.weight, routine_id=None, notes="Actualización Global")
-
-    # Commit Único para todas las operaciones de DB
-    db.commit()
-    db.refresh(new_routine)
-    
-    # 4. Background Analytics
-    bq_data = {
-        "name": user.name,
-        "id": user.id,
-        "goal": profile.goal,
-        "weight": profile.weight,
-        "planType": profile.plan_type,
-        "startDate": profile.start_date,
-        "endDate": profile.end_date,
-        "controlDate": profile.control_date
-    }
-    background_tasks.add_task(write_to_bigquery, bq_data.copy())
-    
-    print(f"PERF: Overall publish-all took {time.time() - overall_start:.4f}s")
-    return {"status": "success", "message": "Todo guardado correctamente"}
+    return {"status": "success", "message": "Todo guardado en BigQuery"}
 
 @app.get("/api/coach/routine/{client_email}")
-def get_client_routine_by_coach(client_email: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    client_user = db.query(models.User).filter(models.User.email == client_email).first()
-    if not client_user:
-        return {"status": "empty", "routine_data": None}
-    routine = db.query(models.Routine).filter(models.Routine.user_id == client_user.id).order_by(models.Routine.created_at.desc()).first()
-    if not routine:
-        return {"status": "empty", "routine_data": None}
-    return {"status": "success", "routine_data": routine.routine_data}
+def get_client_routine_by_coach(client_email: str, current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    user = db.get_user_by_email(client_email)
+    if not user: return {"status": "empty"}
+    routine = db.get_latest_routine(user['id'])
+    return {"status": "success", "routine_data": routine['routine_data'] if routine else None}
 
-# ====================
-# Client Endpoints
-# ====================
 @app.get("/api/client/my-routine")
-def get_my_routine(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    # Fetch the latest routine
-    routine = db.query(models.Routine).filter(models.Routine.user_id == current_user.id).order_by(models.Routine.created_at.desc()).first()
+def get_my_routine(current_user=Depends(auth.get_current_user)):
+    db = get_bq_db()
+    routine = db.get_latest_routine(current_user.id)
+    if not routine: return {"status": "empty"}
     
-    if not routine:
-        return {"status": "empty", "routine_data": None}
-    
-    prof = current_user.profile
-    if prof and prof.end_date:
-        today = datetime.now().strftime("%Y-%m-%d")
-        if prof.end_date < today:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso."
-            )
-    
-    prof = current_user.profile
-    profile_data = {
-        "age": prof.age if prof else "",
-        "weight": prof.weight if prof else "",
-        "goal": prof.goal if prof else "",
-        "planType": prof.plan_type if prof else "",
-        "startDate": prof.start_date if prof else "",
-        "endDate": prof.end_date if prof else "",
-        "controlDate": prof.control_date if prof else ""
-    }
-    
-    # Fetch assigned coach details
     coach_info = None
     if current_user.coach_id:
-        coach = db.query(models.User).filter(models.User.id == current_user.coach_id).first()
+        coach = db.get_user_by_id(current_user.coach_id)
         if coach:
+            # Asegurar que los datos del coach sean strings para evitar errores en el front
             coach_info = {
-                "name": coach.name,
-                "phone": coach.phone,
-                "instagram": coach.instagram
+                "name": str(coach.get('name', '—')) if coach.get('name') else '—',
+                "phone": str(coach.get('phone', '')) if coach.get('phone') else '',
+                "instagram": str(coach.get('instagram', '')) if coach.get('instagram') else ''
             }
 
-    return {
-        "status": "success", 
-        "routine_data": routine.routine_data,
-        "coach": coach_info,
-        "profile": profile_data
-    }
+    return {"status": "success", "routine_data": routine['routine_data'], "coach": coach_info}
 
 @app.get("/api/client/weight-history")
-def get_weight_history(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    history = db.query(models.WeightHistory)\
-        .filter(models.WeightHistory.user_id == current_user.id)\
-        .order_by(models.WeightHistory.created_at.desc())\
-        .all()
-    
-    return [
-        {
-            "id": h.id,
-            "weight": h.weight,
-            "date": h.created_at.strftime("%Y-%m-%d %H:%M"),
-            "notes": h.notes
-        } for h in history
-    ]
+def get_weight_history(current_user=Depends(auth.get_current_user)):
+    db = get_bq_db()
+    history = db.get_weight_history(current_user.id)
+    return [{"id": h['id'], "weight": h['weight'], "date": h['created_at'].strftime("%Y-%m-%d"), "notes": h['notes']} for h in history]
 
 @app.get("/api/coach/list")
-def get_coaches(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    # Solo el Admin debería poder ver y asignar coaches, pero permitimos el acceso para el dropdown
-    coaches = db.query(models.User).filter(models.User.role == "Coach").all()
-    return [{"id": c.id, "name": c.name, "email": c.email, "phone": c.phone, "instagram": c.instagram} for c in coaches]
-
-# ====================
-# Admin Coach Management
-# ====================
-@app.get("/api/admin/coaches")
-def get_admin_coaches(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_admin)):
-    coaches = db.query(models.User).filter(models.User.role == "Coach").all()
+def get_coaches(current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    from database_bq import PROJECT_ID, DATASET_ID
+    sql = f"SELECT DISTINCT id, name, email, phone, instagram FROM `{PROJECT_ID}.{DATASET_ID}.users` WHERE role = 'Coach'"
+    coaches = db.query(sql)
     return coaches
 
+@app.get("/api/admin/coaches")
+def get_admin_coaches(current_user=Depends(auth.get_current_active_admin)):
+    db = get_bq_db()
+    from database_bq import PROJECT_ID, DATASET_ID
+    sql = f"SELECT DISTINCT id, name, email, phone, instagram, is_active FROM `{PROJECT_ID}.{DATASET_ID}.users` WHERE role = 'Coach'"
+    return db.query(sql)
+
 @app.post("/api/admin/coaches")
-def create_coach(req: CoachCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_admin)):
-    # Si el usuario ya existe, actualizamos su rol a Coach y sus datos
-    user = db.query(models.User).filter(models.User.email == req.email).first()
+def create_coach(req: CoachCreate, current_user=Depends(auth.get_current_active_admin)):
+    db = get_bq_db()
+    user = db.get_user_by_email(req.email)
     if user:
-        user.role = "Coach"
-        user.name = req.name
-        user.phone = req.phone
-        user.instagram = req.instagram
-        # Si estaba inactivo, lo activamos por defecto al registrarlo como coach? 
-        # O mantenemos su estado? Por ahora lo mantenemos o forzamos True si es nuevo.
-    else:
-        user = models.User(
-            email=req.email, 
-            name=req.name, 
-            role="Coach", 
-            is_active=True,
-            phone=req.phone,
-            instagram=req.instagram
-        )
-        db.add(user)
-    db.commit()
-    return {"message": f"Coach {req.name} procesado correctamente"}
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
+    
+    new_coach = db.create_user(req.email, req.name, "Coach")
+    # Actualizar campos adicionales
+    from database_bq import PROJECT_ID, DATASET_ID
+    sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.users` SET phone=@phone, instagram=@instagram WHERE id=@id"
+    params = [
+        {"name": "phone", "type": "STRING", "value": req.phone},
+        {"name": "instagram", "type": "STRING", "value": req.instagram},
+        {"name": "id", "type": "INTEGER", "value": new_coach['id']}
+    ]
+    # Usar el cliente directamente para parámetros complejos si es necesario, 
+    # pero nuestra función db.query acepta params básicos
+    from google.cloud import bigquery
+    bq_params = [
+        bigquery.ScalarQueryParameter("phone", "STRING", req.phone),
+        bigquery.ScalarQueryParameter("instagram", "STRING", req.instagram),
+        bigquery.ScalarQueryParameter("id", "INTEGER", new_coach['id'])
+    ]
+    db.query(sql, bq_params)
+    return {"status": "success", "message": "Coach creado en BigQuery"}
 
 @app.delete("/api/admin/coaches/{coach_id}")
-def delete_coach(coach_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_admin)):
-    coach = db.query(models.User).filter(models.User.id == coach_id, models.User.role == "Coach").first()
-    if not coach:
-        raise HTTPException(status_code=404, detail="Coach no encontrado")
-    
-    # Lo bajamos a Cliente en lugar de borrarlo para mantener integridad referencial si tuviera clientes asociados
-    coach.role = "Client"
-    db.commit()
-    return {"message": "Coach removido y convertido a cliente"}
+def delete_coach(coach_id: int, current_user=Depends(auth.get_current_active_admin)):
+    db = get_bq_db()
+    from database_bq import PROJECT_ID, DATASET_ID
+    sql = f"DELETE FROM `{PROJECT_ID}.{DATASET_ID}.users` WHERE id = @id AND role = 'Coach'"
+    params = [bigquery.ScalarQueryParameter("id", "INTEGER", coach_id)]
+    db.query(sql, params)
+    return {"message": "Coach eliminado"}
 
-# ====================
-# NOTIFICACIONES
-# ====================
 @app.get("/api/notifications")
-def get_notifications(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    notifs = db.query(models.Notification)\
-        .filter(models.Notification.user_id == current_user.id)\
-        .order_by(models.Notification.created_at.desc())\
-        .all()
-    
-    return [
-        {
-            "id": n.id,
-            "message": n.message,
-            "date": n.created_at.strftime("%d/%m/%Y %H:%M"),
-            "is_read": n.is_read
-        } for n in notifs
-    ]
+def get_notifications(current_user=Depends(auth.get_current_user)):
+    db = get_bq_db()
+    notifs = db.get_notifications(current_user.id)
+    return [{"id": n['id'], "message": n['message'], "date": n['created_at'].strftime("%d/%m %H:%M"), "is_read": n['is_read']} for n in notifs]
 
 @app.delete("/api/notifications/{notif_id}")
-def delete_notification(notif_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    notif = db.query(models.Notification).filter(models.Notification.id == notif_id, models.Notification.user_id == current_user.id).first()
-    if not notif:
-        raise HTTPException(status_code=404, detail="Notificación no encontrada")
-    
-    db.delete(notif)
-    db.commit()
-    return {"message": "Notificación eliminada"}
+def delete_notification(notif_id: int, current_user=Depends(auth.get_current_user)):
+    db = get_bq_db()
+    db.delete_notification(notif_id, current_user.id)
+    return {"message": "Eliminada"}
 
-# ====================
-# PAGOS (COACH -> ADMIN)
-# ====================
 @app.get("/api/coach/payments")
-def get_coach_payments(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
-    payments = db.query(models.Payment)\
-        .filter(models.Payment.coach_id == current_user.id)\
-        .order_by(models.Payment.created_at.desc())\
-        .all()
-    
-    return [
-        {
-            "id": p.id,
-            "client_name": p.client_name,
-            "amount": p.amount,
-            "plan_type": p.plan_type,
-            "status": p.status,
-            "date": p.created_at.strftime("%d/%m/%Y")
-        } for p in payments
-    ]
+def get_coach_payments(current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    payments = db.get_payments(coach_id=current_user.id)
+    return [{"id": p['id'], "client_name": p['client_name'], "amount": p['amount'], "status": p['status'], "date": p['created_at'].strftime("%d/%m/%Y")} for p in payments]
 
 @app.post("/api/coach/payments/pay")
-def pay_balance(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_coach)):
+def pay_balance(current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
     batch_id = str(uuid.uuid4())
-    
-    # 1. Obtener los IDs de los clientes asociados a pagos pendientes antes de actualizar
-    pending_payments = db.query(models.Payment).filter(
-        models.Payment.coach_id == current_user.id, 
-        models.Payment.status == "Pending"
-    ).all()
-    
-    client_ids = [p.client_id for p in pending_payments]
-    
-    # 2. Marcar pagos como pagados
-    db.query(models.Payment)\
-        .filter(models.Payment.coach_id == current_user.id, models.Payment.status == "Pending")\
-        .update({"status": "Paid", "batch_id": batch_id}, synchronize_session=False)
-    
-    # 3. Reactivar al Coach
-    current_user.is_active = True
-    
-    # 4. Reactivar a los clientes afectados por este pago
-    # Solo los activamos si la fecha de fin del plan es hoy o futura
-    today_str = now_bogota().strftime("%Y-%m-%d")
-    for cid in set(client_ids):
-        u = db.query(models.User).filter(models.User.id == cid).first()
-        if u and u.profile:
-            if u.profile.end_date >= today_str:
-                u.is_active = True
-    
-    db.commit()
-    return {"message": "Saldo pagado exitosamente. Cuenta y atletas reactivados.", "batch_id": batch_id}
+    db.pay_balance(current_user.id, batch_id)
+    return {"message": "Pagado", "batch_id": batch_id}
 
-# ====================
-# ADMIN PAGOS
-# ====================
 @app.get("/api/admin/payments")
-def get_admin_payments(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_admin)):
-    payments = db.query(models.Payment).filter(models.Payment.status == "Paid").all()
-    batches = {}
-    for p in payments:
-        bid = p.batch_id or "legacy"
-        if bid not in batches:
-            coach = db.query(models.User).filter(models.User.id == p.coach_id).first()
-            batches[bid] = {
-                "batch_id": bid,
-                "coach_name": coach.name if coach else "Desconocido",
-                "coach_id": p.coach_id,
-                "date": p.created_at.strftime("%d/%m/%Y"),
-                "total_amount": 0,
-                "clients_count": 0,
-                "clients": []
-            }
-        batches[bid]["total_amount"] += p.amount
-        batches[bid]["clients_count"] += 1
-        
-        # Obtener detalles del cliente (perfil)
-        client = db.query(models.User).filter(models.User.id == p.client_id).first()
-        batches[bid]["clients"].append({
-            "name": p.client_name,
-            "plan_type": p.plan_type,
-            "amount": p.amount,
-            "start_date": client.profile.start_date if client and client.profile else "—",
-            "end_date": client.profile.end_date if client and client.profile else "—"
-        })
-    
-    return sorted(list(batches.values()), key=lambda x: x["date"], reverse=True)
+def get_admin_payments(current_user=Depends(auth.get_current_active_admin)):
+    db = get_bq_db()
+    return db.get_payments(is_admin=True)
 
 @app.get("/")
 def read_root():
-    return {"message": "Body Logic API con SQLite, Auth y BigQuery"}
+    return {"message": "Body Logic API running on BigQuery Serverless"}

@@ -6,4 +6,3 @@ venv/
 env/
 .git/
 bodybyja.db
-secrets/

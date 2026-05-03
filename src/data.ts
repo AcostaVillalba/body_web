@@ -14,36 +14,43 @@ export const EXERCISES_DB: Record<string, string[]> = {
   "CARDIO": ["Caminadora", "Bicicleta estática", "Bicicleta estática reclinada", "Elíptica", "Bicicleta de aire", "Escaladora"]
 };
 
-// Obtenemos todas las imágenes de la carpeta assets/gifs
-const assetImages = import.meta.glob('./assets/gifs/*.{gif,webm,mp4}', { eager: true, import: 'default' });
-
-// Función para normalizar el nombre del ejercicio al formato de archivo
-// ej: "Press de banca con barra" -> "pressdebancaconbarra"
+// Función para normalizar nombres: quita acentos, espacios, guiones y caracteres especiales
 const formatFileName = (name: string) => {
+  if (!name) return '';
   return name.toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
-    .replace(/\s+/g, '') // spaces to underscores
-    .replace(/[^a-z0-9_]/g, ''); // remove special characters
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+    .replace(/[^a-z0-9]/g, '');      // Mantener SOLO letras y números
 };
 
+// Obtenemos todos los archivos y creamos un mapa indexado por nombre normalizado (sin hashes de Vite)
+const rawAssets = import.meta.glob('./assets/gifs/*.{gif,webm,mp4}', { eager: true, import: 'default' });
+
+const assetMap: Record<string, string> = {};
+Object.entries(rawAssets).forEach(([path, url]) => {
+  const fileName = (path.split('/').pop() || '').split('?')[0];
+  const nameWithoutExt = fileName.split('.')[0] || '';
+  
+  // Limpiar el hash de Vite para la CLAVE del mapa (ej: "ejercicio-BGkil9Pa" -> "ejercicio")
+  // Pero el VALOR (la url) conservará el hash original para que Vite lo encuentre
+  const nameWithoutHash = nameWithoutExt.replace(/-[a-zA-Z0-9]{8,}$/, '');
+  
+  const normalized = formatFileName(nameWithoutHash);
+  if (normalized) {
+    assetMap[normalized] = url as string;
+  }
+});
+
+// Función para obtener la URL de la imagen/video
 export const getImageUrl = (exerciseName: string) => {
   if (!exerciseName) return '';
+  
+  const searchName = formatFileName(exerciseName);
+  
+  // Coincidencia exacta en el mapa limpio (donde las claves no tienen hashes)
+  if (assetMap[searchName]) return assetMap[searchName];
 
-  const formattedName = formatFileName(exerciseName);
-
-  // Buscamos la imagen ignorando mayúsculas/minúsculas o extensiones exactas
-  const matchedPath = Object.keys(assetImages).find(path => {
-    // Extraer solo el nombre del archivo de './assets/MiImagen.jpg' -> 'miimagen'
-    const fileName = path.split('/').pop()?.split('.')[0] || '';
-    // Normalizar el nombre de archivo iterado con la misma función para compararlos
-    return formatFileName(fileName) === formattedName;
-  });
-
-  if (matchedPath) {
-    return assetImages[matchedPath] as string;
-  }
-
-  // Fallback como respaldo si no hay imagen en assets
+  // Fallback: Placeholder si no hay coincidencia
   return `https://placehold.co/600x400/111/c5a021?text=${encodeURIComponent(exerciseName)}&font=montserrat`;
 };
 
@@ -51,5 +58,5 @@ export const getImageUrl = (exerciseName: string) => {
 export const preloadImage = (url: string) => {
   if (!url) return;
   // Usamos fetch con prioridad baja para poner el archivo (gif o webm) en caché
-  fetch(url, { priority: 'low' }).catch(() => {});
+  fetch(url, { priority: 'low' }).catch(() => { });
 };

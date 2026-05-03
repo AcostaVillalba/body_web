@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "python-learning-401121",
+    "site": "body-web-491923",
     "public": "dist",
     "ignore": [
       "firebase.json",
