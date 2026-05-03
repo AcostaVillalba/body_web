@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight, DollarSign, FileText } from 'lucide-react';
+import { Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight, DollarSign, FileText, Menu } from 'lucide-react';
 import CoachDashboard, { type RoutineDay } from './CoachDashboard';
 import '../App.css';
 import logoBody2 from '../assets/logobody2.png';
@@ -10,6 +10,8 @@ import { getImageUrl } from '../data';
 const AdminDashboard = () => {
   const { token, logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'users' | 'create' | 'coaches' | 'payments'>('users');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAddingCoach, setIsAddingCoach] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [coachesList, setCoachesList] = useState<any[]>([]); // Para la pestaña de gestión
   const [adminPayments, setAdminPayments] = useState<any[]>([]);
@@ -94,6 +96,7 @@ const AdminDashboard = () => {
       if (res.ok) {
         setNewCoach({ name: '', email: '', phone: '', instagram: '' });
         setEditingCoachId(null);
+        setIsAddingCoach(false);
         fetchCoaches();
         alert(editingCoachId ? "Coach actualizado correctamente" : "Coach registrado correctamente");
       } else {
@@ -264,77 +267,136 @@ const AdminDashboard = () => {
         backgroundImage: `url(${logoBody2})`, backgroundRepeat: 'repeat', backgroundSize: '200px',
         opacity: 0.08, pointerEvents: 'none', zIndex: 0
       }} />
-      {/* Top Banner */}
-      <div style={{ background: '#2d4739', padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', position: 'relative', zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <img src={logoBody2} alt="Logo" style={{ width: 60, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
-          <div>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900, letterSpacing: '-0.5px' }}>
+      {/* Navigation - Hamburger / Sidebar */}
+      <div style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        height: '70px', 
+        background: '#2d4739', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        padding: '0 20px', 
+        color: '#fff', 
+        zIndex: 1000,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+          <button 
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: '#fff', 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '8px'
+            }}>
+            {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src={logoBody2} alt="Logo" style={{ width: 40 }} />
+            <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 900 }}>
               BODY <span style={{ color: '#a2d149' }}>LOGIC</span>
             </h1>
-            <p style={{ margin: 0, fontSize: '11px', color: '#a2d149', letterSpacing: '2px', textTransform: 'uppercase', fontWeight: 800 }}>
-              ADMINISTRATOR PANEL
-            </p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#ccc' }}>Hola, {user?.name}</span>
-          <button
-            onClick={logout}
-            style={{ background: '#333', color: '#f87171', border: 'none', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
-            <LogOut size={16} /> Salir
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#a2d149' }}>{user?.name}</span>
+          <button onClick={logout} style={{ background: '#333', color: '#f87171', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: '11px', fontWeight: 800, cursor: 'pointer' }}>
+            SALIR
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ maxWidth: 1200, margin: '30px auto 0', padding: '0 20px' }}>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-          <button
-            onClick={() => { setActiveTab('users'); setEditingClientEmail(null); }}
-            style={{
-              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
-              background: activeTab === 'users' ? '#a2d149' : '#fff',
-              color: activeTab === 'users' ? '#1e293b' : '#64748b',
-              boxShadow: activeTab === 'users' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
-            }}>
-            <Users size={18} /> ADMINISTRAR USUARIOS
-          </button>
-          <button
-            onClick={() => { setActiveTab('create'); setEditingClientEmail(null); }}
-            style={{
-              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
-              background: activeTab === 'create' ? '#a2d149' : '#fff',
-              color: activeTab === 'create' ? '#1e293b' : '#64748b',
-              boxShadow: activeTab === 'create' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
-            }}>
-            <PlusCircle size={18} /> CREAR RUTINA
-          </button>
-          <button
-            onClick={() => { setActiveTab('coaches'); setEditingClientEmail(null); }}
-            style={{
-              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
-              background: activeTab === 'coaches' ? '#a2d149' : '#fff',
-              color: activeTab === 'coaches' ? '#1e293b' : '#64748b',
-              boxShadow: activeTab === 'coaches' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
-            }}>
-            <Shield size={18} /> GESTIÓN DE COACHES
-          </button>
-          <button
-            onClick={() => { setActiveTab('payments'); setEditingClientEmail(null); }}
-            style={{
-              padding: '12px 24px', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '13px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
-              background: activeTab === 'payments' ? '#a2d149' : '#fff',
-              color: activeTab === 'payments' ? '#1e293b' : '#64748b',
-              boxShadow: activeTab === 'payments' ? '0 4px 12px rgba(162, 209, 73, 0.3)' : '0 2px 4px rgba(0,0,0,0.05)'
-            }}>
-            <DollarSign size={18} /> CONTROL DE PAGOS
-          </button>
+      {/* Sidebar Overlay */}
+      {isMenuOpen && (
+        <div 
+          onClick={() => setIsMenuOpen(false)}
+          style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: 'rgba(0,0,0,0.5)', 
+            zIndex: 998,
+            backdropFilter: 'blur(4px)'
+          }} 
+        />
+      )}
+
+      {/* Sidebar Menu */}
+      <div style={{ 
+        position: 'fixed', 
+        top: '70px', 
+        left: isMenuOpen ? 0 : '-300px', 
+        width: '280px', 
+        height: 'calc(100vh - 70px)', 
+        background: '#fff', 
+        zIndex: 999, 
+        transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        boxShadow: '4px 0 15px rgba(0,0,0,0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '20px 0'
+      }}>
+        <div style={{ padding: '0 20px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <p style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 10px 0' }}>Módulos de Gestión</p>
         </div>
+
+        <div style={{ flex: 1, padding: '10px 15px' }}>
+          {[
+            { id: 'users', label: 'ADMINISTRAR USUARIOS', icon: <Users size={20} /> },
+            { id: 'create', label: 'CREAR RUTINA', icon: <PlusCircle size={20} /> },
+            { id: 'coaches', label: 'GESTIÓN DE COACHES', icon: <Shield size={20} /> },
+            { id: 'payments', label: 'CONTROL DE PAGOS', icon: <DollarSign size={20} /> },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id as any); setEditingClientEmail(null); setIsMenuOpen(false); }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '14px 20px',
+                marginBottom: '8px',
+                borderRadius: '12px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 800,
+                fontSize: '13px',
+                transition: 'all 0.2s',
+                textAlign: 'left',
+                background: activeTab === tab.id ? '#f0f9ff' : 'transparent',
+                color: activeTab === tab.id ? '#2d4739' : '#64748b',
+                borderLeft: activeTab === tab.id ? '4px solid #a2d149' : '4px solid transparent'
+              }}>
+              <span style={{ color: activeTab === tab.id ? '#a2d149' : 'inherit' }}>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px' }}>
+            <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#a2d149', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2d4739', fontWeight: 900, fontSize: 14 }}>
+              {user?.name?.[0].toUpperCase()}
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{user?.name}</p>
+              <p style={{ margin: 0, fontSize: 10, color: '#64748b' }}>Administrador</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '100px 20px 40px' }}>
 
         {/* Content */}
         <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
@@ -702,7 +764,6 @@ const AdminDashboard = () => {
               ) : (
                 <CoachDashboard
                   hideHeader={true}
-                  hideTabs={true}
                   preloadedEmail={editingClientEmail}
                   preloadedRoutine={editingRoutine || []}
                   onCancel={() => setEditingClientEmail(null)}
@@ -714,125 +775,130 @@ const AdminDashboard = () => {
           {/* TAB 2: CREATE ROUTINE (COACH MODE) */}
           {activeTab === 'create' && (
             <div style={{ padding: '0' }}>
-              <CoachDashboard hideHeader={true} hideTabs={true} />
+              <CoachDashboard hideHeader={true} />
             </div>
           )}
 
           {/* TAB 3: COACH MANAGEMENT */}
           {activeTab === 'coaches' && (
-            <div style={{ padding: '30px 40px' }}>
-              <div style={{ display: 'flex', gap: 30 }}>
-                {/* Formulario Izquierda */}
-                <div style={{ flex: '0 0 320px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div className="section-title" style={{ marginTop: 0 }}>{editingCoachId ? 'Editar Coach' : 'Registrar Nuevo Coach'}</div>
-                    {editingCoachId && (
-                      <button 
-                        onClick={() => { setEditingCoachId(null); setNewCoach({ name: '', email: '', phone: '', instagram: '' }); }}
-                        style={{ background: '#f1f5f9', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontWeight: 800 }}
-                      >CANCELAR</button>
-                    )}
+            <div style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 25 }}>
+                
+                {/* Header & Toggle Button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#2d4739' }}>GESTIÓN DE EQUIPO</h2>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Administra y supervisa a los coaches de Body Logic</p>
                   </div>
-                  <form onSubmit={handleCreateCoach} style={{ background: '#f8fafc', padding: 25, borderRadius: 16, border: '2px solid #e2e8f0' }}>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>NOMBRE COMPLETO</label>
-                      <input
-                        required
-                        placeholder="Ej: Juan Pérez"
-                        value={newCoach.name}
-                        onChange={e => setNewCoach({ ...newCoach, name: e.target.value })}
-                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>CORREO GMAIL</label>
-                      <input
-                        required
-                        type="email"
-                        placeholder="ejemplo@gmail.com"
-                        value={newCoach.email}
-                        onChange={e => setNewCoach({ ...newCoach, email: e.target.value })}
-                        style={{ width: '100%', padding: '12px', border: editingCoachId ? '1px solid #e2e8f0' : '1px solid #a2d149', borderRadius: 8, outline: 'none' }}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>TELÉFONO</label>
-                      <input
-                        placeholder="Ej: +57 300 123 4567"
-                        value={newCoach.phone}
-                        onChange={e => setNewCoach({ ...newCoach, phone: e.target.value })}
-                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 20 }}>
-                      <label style={{ fontSize: 11, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>INSTAGRAM (USUARIO)</label>
-                      <input
-                        placeholder="Ej: @coach_fitness"
-                        value={newCoach.instagram}
-                        onChange={e => setNewCoach({ ...newCoach, instagram: e.target.value })}
-                        style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
-                      />
-                    </div>
-                    <button style={{ width: '100%', background: '#2d4739', color: '#fff', padding: '14px', borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      {editingCoachId ? <Save size={18} /> : <PlusCircle size={18} />} {editingCoachId ? 'GUARDAR CAMBIOS' : 'AGREGAR COACH'}
+                  {!isAddingCoach && !editingCoachId && (
+                    <button 
+                      onClick={() => setIsAddingCoach(true)}
+                      style={{ 
+                        background: '#a2d149', color: '#1e293b', border: 'none', padding: '12px 20px', borderRadius: '12px', 
+                        fontWeight: 800, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                        boxShadow: '0 4px 12px rgba(162, 209, 73, 0.3)'
+                      }}>
+                      <PlusCircle size={18} /> AGREGAR NUEVO COACH
                     </button>
-                  </form>
+                  )}
                 </div>
 
-                {/* Tabla Derecha */}
-                <div style={{ flex: 1 }}>
-                  <div className="section-title" style={{ marginTop: 0 }}>Coaches Activos</div>
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden' }}>
+                {/* Conditional Form (Modal-like or Collapsible) */}
+                {(isAddingCoach || editingCoachId) && (
+                  <div style={{ 
+                    background: '#f8fafc', padding: '30px', borderRadius: '20px', border: '2px solid #e2e8f0',
+                    animation: 'fadeIn 0.3s ease-out'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800 }}>{editingCoachId ? 'EDITAR COACH' : 'REGISTRAR NUEVO COACH'}</h3>
+                      <button 
+                        onClick={() => { setIsAddingCoach(false); setEditingCoachId(null); setNewCoach({ name: '', email: '', phone: '', instagram: '' }); }}
+                        style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', cursor: 'pointer', fontWeight: 800 }}
+                      >CANCELAR</button>
+                    </div>
+                    
+                    <form onSubmit={handleCreateCoach} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 20 }}>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>NOMBRE COMPLETO</label>
+                        <input required placeholder="Ej: Juan Pérez" value={newCoach.name} onChange={e => setNewCoach({ ...newCoach, name: e.target.value })} style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>CORREO GMAIL</label>
+                        <input required type="email" placeholder="ejemplo@gmail.com" value={newCoach.email} onChange={e => setNewCoach({ ...newCoach, email: e.target.value })} style={{ width: '100%', padding: '12px', border: editingCoachId ? '1px solid #e2e8f0' : '1px solid #a2d149', borderRadius: 8, outline: 'none' }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>TELÉFONO</label>
+                        <input placeholder="Ej: +57 300 123 4567" value={newCoach.phone} onChange={e => setNewCoach({ ...newCoach, phone: e.target.value })} style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 5 }}>INSTAGRAM</label>
+                        <input placeholder="Ej: @coach_fitness" value={newCoach.instagram} onChange={e => setNewCoach({ ...newCoach, instagram: e.target.value })} style={{ width: '100%', padding: '12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button style={{ background: '#2d4739', color: '#fff', padding: '14px 40px', borderRadius: 12, border: 'none', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {editingCoachId ? <Save size={18} /> : <PlusCircle size={18} />} {editingCoachId ? 'GUARDAR CAMBIOS' : 'CONFIRMAR REGISTRO'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* Coaches Table Section */}
+                <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+                  <div style={{ padding: '20px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#475569' }}>COACHES ACTIVOS ({coachesList.length})</h3>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                       <thead>
-                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '10px', textTransform: 'uppercase' }}>
-                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Nombre</th>
-                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Email</th>
-                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Teléfono</th>
-                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Instagram</th>
-                          <th style={{ padding: '12px 10px', fontWeight: 800 }}>Estado</th>
-                          <th style={{ padding: '12px 10px', fontWeight: 800, textAlign: 'center' }}>Acciones</th>
+                        <tr style={{ background: '#fff', borderBottom: '2px solid #f1f5f9', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          <th style={{ padding: '16px 20px', fontWeight: 800, color: '#64748b' }}>Nombre</th>
+                          <th style={{ padding: '16px 20px', fontWeight: 800, color: '#64748b' }}>Email</th>
+                          <th style={{ padding: '16px 20px', fontWeight: 800, color: '#64748b' }}>Teléfono</th>
+                          <th style={{ padding: '16px 20px', fontWeight: 800, color: '#64748b' }}>Instagram</th>
+                          <th style={{ padding: '16px 20px', fontWeight: 800, color: '#64748b' }}>Estado</th>
+                          <th style={{ padding: '16px 20px', fontWeight: 800, color: '#64748b', textAlign: 'center' }}>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {coachesList.map(c => (
-                          <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '12px 10px', fontWeight: 700, fontSize: '12px' }}>{c.name}</td>
-                            <td style={{ padding: '12px 10px', color: '#64748b', fontSize: '12px' }}>{c.email}</td>
-                            <td style={{ padding: '12px 10px', color: '#64748b', fontSize: '12px' }}>{c.phone || '-'}</td>
-                            <td style={{ padding: '12px 10px', color: '#64748b', fontSize: '12px' }}>{c.instagram || '-'}</td>
-                            <td style={{ padding: '12px 10px' }}>
+                          <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}>
+                            <td style={{ padding: '16px 20px', fontWeight: 700, fontSize: '14px', color: '#1e293b' }}>{c.name}</td>
+                            <td style={{ padding: '16px 20px', color: '#64748b', fontSize: '13px' }}>{c.email}</td>
+                            <td style={{ padding: '16px 20px', color: '#64748b', fontSize: '13px' }}>{c.phone || '-'}</td>
+                            <td style={{ padding: '16px 20px', color: '#a2d149', fontSize: '13px', fontWeight: 700 }}>{c.instagram || '-'}</td>
+                            <td style={{ padding: '16px 20px' }}>
                                <button
                                  onClick={() => handleToggleCoachStatus(c.id, c.is_active)}
                                  style={{ 
                                    background: c.is_active ? '#dcfce7' : '#fee2e2', 
                                    color: c.is_active ? '#166534' : '#991b1b',
-                                   border: 'none', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 800, fontSize: 10
+                                   border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: 800, fontSize: '10px'
                                  }}
                                >
-                                 {c.is_active ? 'ACTIVO' : 'INACTIVO'}
+                                 {c.is_active ? '● ACTIVO' : '○ INACTIVO'}
                                </button>
                              </td>
-                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
-                               <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                             <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                               <div style={{ display: 'flex', gap: 15, justifyContent: 'center' }}>
                                  <button
                                    onClick={() => handleStartEditCoach(c)}
-                                   style={{ background: 'transparent', border: 'none', color: '#2d4739', cursor: 'pointer', fontWeight: 800, fontSize: 11, padding: 0 }}
+                                   style={{ background: 'transparent', border: 'none', color: '#2d4739', cursor: 'pointer', fontWeight: 800, fontSize: '12px' }}
                                  >
                                    Editar
                                  </button>
                                  <button
                                    onClick={() => handleDeleteCoach(c.id)}
-                                   style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 800, fontSize: 11, padding: 0 }}
+                                   style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 800, fontSize: '12px' }}
                                  >
-                                   Eliminar
+                                   Remover
                                  </button>
                                </div>
                              </td>
                           </tr>
                         ))}
                         {coachesList.length === 0 && (
-                          <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No hay coaches registrados.</td></tr>
+                          <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>No hay coaches registrados en el sistema.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -841,6 +907,7 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
+
 
           {/* TAB 4: CONTROL DE PAGOS */}
           {activeTab === 'payments' && (

@@ -26,11 +26,13 @@ const Login = () => {
       if (!token) throw new Error("No token received");
 
       // Verify token with backend
+      console.log("DEBUG: Enviando token al backend:", `${API_URL}/api/auth/google`);
       const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
       });
+      console.log("DEBUG: Respuesta recibida del backend:", res.status);
 
       if (!res.ok) {
         throw new Error("Fallo la autenticación con el servidor.");
@@ -142,7 +144,7 @@ const Login = () => {
           onError={() => {
             setErrorMsg('El inicio de sesión falló. Por favor, intenta de nuevo.');
           }}
-          useOneTap
+          ux_mode="popup"
           theme="outline"
           shape="pill"
         />

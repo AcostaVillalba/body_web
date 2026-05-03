@@ -1,3 +1,4 @@
+from google.cloud import bigquery
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ app = FastAPI(title="Body Logic BigQuery Server")
 # Configuración de CORS
 origins = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:3000",
     "https://body-web-491923.web.app",
     "https://body-web-491923.firebaseapp.com",
@@ -23,7 +25,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
@@ -74,6 +76,7 @@ class PublishAllReq(BaseModel):
 # ====================
 @app.post("/api/auth/google")
 def google_auth(req: TokenReq):
+    print(f"DEBUG: Login attempt for token: {req.token[:20]}...")
     idinfo = auth.verify_google_token(req.token)
     email = idinfo.get("email")
     name = idinfo.get("name")
@@ -218,20 +221,36 @@ def get_client_routine_by_coach(client_email: str, current_user=Depends(auth.get
 def get_my_routine(current_user=Depends(auth.get_current_user)):
     db = get_bq_db()
     routine = db.get_latest_routine(current_user.id)
-    if not routine: return {"status": "empty"}
+    
+    profile = db.get_client_profile(current_user.id)
+    profile_info = None
+    if profile:
+        profile_info = {
+            "age": profile.get('age', ''),
+            "weight": profile.get('weight', ''),
+            "goal": profile.get('goal', ''),
+            "planType": profile.get('plan_type', ''),
+            "startDate": profile.get('start_date', ''),
+            "endDate": profile.get('end_date', ''),
+            "controlDate": profile.get('control_date', '')
+        }
     
     coach_info = None
     if current_user.coach_id:
         coach = db.get_user_by_id(current_user.coach_id)
         if coach:
-            # Asegurar que los datos del coach sean strings para evitar errores en el front
             coach_info = {
                 "name": str(coach.get('name', '—')) if coach.get('name') else '—',
                 "phone": str(coach.get('phone', '')) if coach.get('phone') else '',
                 "instagram": str(coach.get('instagram', '')) if coach.get('instagram') else ''
             }
 
-    return {"status": "success", "routine_data": routine['routine_data'], "coach": coach_info}
+    return {
+        "status": "success", 
+        "routine_data": routine['routine_data'] if routine else None, 
+        "coach": coach_info,
+        "profile": profile_info
+    }
 
 @app.get("/api/client/weight-history")
 def get_weight_history(current_user=Depends(auth.get_current_user)):
@@ -262,17 +281,11 @@ def create_coach(req: CoachCreate, current_user=Depends(auth.get_current_active_
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
     
     new_coach = db.create_user(req.email, req.name, "Coach")
-    # Actualizar campos adicionales
+    
+    # Actualizar campos adicionales (phone e instagram)
     from database_bq import PROJECT_ID, DATASET_ID
     sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.users` SET phone=@phone, instagram=@instagram WHERE id=@id"
-    params = [
-        {"name": "phone", "type": "STRING", "value": req.phone},
-        {"name": "instagram", "type": "STRING", "value": req.instagram},
-        {"name": "id", "type": "INTEGER", "value": new_coach['id']}
-    ]
-    # Usar el cliente directamente para parámetros complejos si es necesario, 
-    # pero nuestra función db.query acepta params básicos
-    from google.cloud import bigquery
+    
     bq_params = [
         bigquery.ScalarQueryParameter("phone", "STRING", req.phone),
         bigquery.ScalarQueryParameter("instagram", "STRING", req.instagram),

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { EXERCISES_DB, getImageUrl, preloadImage } from '../data';
-import { LogOut, Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign, Filter, Calendar, RotateCcw, Bell, Trash2 } from 'lucide-react';
+import { Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign, Filter, RotateCcw, Bell, Menu, X, ChevronDown, ChevronUp } from 'lucide-react';
 import '../App.css';
 import logoBody2 from '../assets/logobody2.png';
 import ExerciseImage from '../components/ExerciseImage';
@@ -50,22 +50,22 @@ export interface CoachDashboardProps {
   preloadedEmail?: string;
   preloadedRoutine?: RoutineDay[];
   hideHeader?: boolean;
-  hideTabs?: boolean;
   onCancel?: () => void;
   isReadOnly?: boolean;
 }
 
-const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) => {
+export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideHeader, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) {
   const { token, logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'create' | 'users' | 'payments'>(preloadedEmail ? 'create' : 'create');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewingEmail, setViewingEmail] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(propIsReadOnly || false);
   const [clients, setClients] = useState<AthleteData[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [planFilter, setPlanFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   // Bloqueo de Coach Inactivo
   const isCoachBlocked = user?.role === 'Coach' && !user.isActive;
@@ -119,17 +119,20 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
     if (payments.length > 0) checkPaymentWarning();
   }, [payments]);
 
-  // Cerrar notificaciones al hacer click fuera
+  // Cerrar menús al hacer click fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (isNotifOpen && !target.closest('.notif-container')) {
         setIsNotifOpen(false);
       }
+      if (isFiltersOpen && !target.closest('.filter-container')) {
+        setIsFiltersOpen(false);
+      }
     };
     document.onmousedown = handleClickOutside;
     return () => { document.onmousedown = null; };
-  }, [isNotifOpen]);
+  }, [isNotifOpen, isFiltersOpen]);
 
   useEffect(() => {
     if (user) fetchNotifications();
@@ -328,7 +331,6 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
 
   const handleViewRoutineFromList = async (clientEmail: string) => {
     setIsLoading(true);
-    setViewingEmail(clientEmail);
     setIsReadOnly(true);
     try {
       const res = await fetch(`${API_URL}/api/coach/routine/${clientEmail}`, { headers: authHeaders });
@@ -368,7 +370,6 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
   };
 
   const handleBackToList = () => {
-    setViewingEmail(null);
     setIsReadOnly(false);
     setActiveTab('users');
     setAthlete(emptyAthlete);
@@ -586,140 +587,223 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
           <option key={c.email} value={c.email}>{c.name}</option>
         ))}
       </datalist>
-      <div className="admin-container" style={{ position: 'relative', overflow: 'hidden' }}>
-        {/* Background Watermark */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundImage: `url(${logoBody2})`, backgroundRepeat: 'repeat', backgroundSize: '220px',
-          opacity: 0.06, pointerEvents: 'none', zIndex: 0
-        }} />
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 768px) {
+          .filters-dropdown, .notif-dropdown {
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            right: auto !important;
+            transform: translate(-50%, -50%) !important;
+            width: 90vw !important;
+            max-width: 350px !important;
+            z-index: 2000 !important;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3) !important;
+          }
+          .filters-overlay, .notif-overlay {
+            display: block !important;
+          }
+        }
+      `}</style>
+    <div style={{ background: '#f4f7f5', minHeight: '100vh', paddingBottom: 40, fontFamily: "'Montserrat', sans-serif", position: 'relative' }}>
+      {/* Background Watermark */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+        backgroundImage: `url(${logoBody2})`, backgroundRepeat: 'repeat', backgroundSize: '200px',
+        opacity: 0.08, pointerEvents: 'none', zIndex: 0
+      }} />
 
-        {!hideHeader && (
-          <>
-            <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', alignItems: 'center', gap: 15, zIndex: 1000 }}>
-              {/* Notification Bell */}
+      {!hideHeader && (
+        <>
+          {/* Navigation - Hamburger / Sidebar */}
+          <div style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            height: '70px', 
+            background: '#2d4739', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            padding: '0 20px', 
+            color: '#fff', 
+            zIndex: 1000,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+              <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: '#fff', 
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px'
+                }}>
+                {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <img src={logoBody2} alt="Logo" style={{ width: 40 }} />
+                <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 900 }}>
+                  BODY <span style={{ color: '#a2d149' }}>LOGIC</span>
+                </h1>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+              {/* Notificaciones */}
               <div className="notif-container" style={{ position: 'relative' }}>
                 <button 
                   onClick={() => setIsNotifOpen(!isNotifOpen)}
-                  style={{ background: '#f8fafc', border: 'none', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}
-                  onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
-                  onMouseOut={e => e.currentTarget.style.background = '#f8fafc'}
-                >
-                  <Bell size={20} />
+                  style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Bell size={24} />
                   {notifications.filter(n => !n.is_read).length > 0 && (
-                    <div style={{ position: 'absolute', top: -2, right: -2, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 900, minWidth: 18, height: 18, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                    <span style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, border: '2px solid #2d4739' }}>
                       {notifications.filter(n => !n.is_read).length}
-                    </div>
+                    </span>
                   )}
                 </button>
-
                 {isNotifOpen && (
-                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 10, width: 320, background: '#fff', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                    <div style={{ padding: '15px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: '#1e293b' }}>NOTIFICACIONES</span>
-                      <button onClick={() => setIsNotifOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: 16, cursor: 'pointer', color: '#94a3b8' }}>&times;</button>
-                    </div>
-                    <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                          No tienes notificaciones
-                        </div>
-                      ) : (
-                        notifications.map(n => (
-                          <div key={n.id} style={{ 
-                            padding: '15px 20px', 
-                            borderBottom: '1px solid #f1f5f9', 
-                            background: n.is_read ? '#fff' : '#f0fdf4',
-                            position: 'relative',
-                            transition: 'background 0.2s'
-                          }}>
-                            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#334155', fontWeight: n.is_read ? 500 : 700 }}>
-                              {n.message}
-                            </p>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                              <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
-                                {new Date(n.created_at).toLocaleDateString()}
-                              </span>
+                  <>
+                    <div 
+                      className="notif-overlay"
+                      onClick={() => setIsNotifOpen(false)}
+                      style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1099, backdropFilter: 'blur(2px)' }} 
+                    />
+                    <div className="notif-dropdown" style={{ position: 'absolute', top: 40, right: 0, width: 320, background: '#fff', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 1100, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                      <div style={{ padding: '15px 20px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h4 style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#1e293b' }}>NOTIFICACIONES</h4>
+                        <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700 }}>{notifications.length} TOTAL</span>
+                      </div>
+                      <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                        {notifications.map(n => (
+                          <div key={n.id} style={{ padding: 15, borderBottom: '1px solid #f1f5f9', background: n.is_read ? '#fff' : '#f0fdf4', position: 'relative' }}>
+                            <p style={{ margin: '0 0 5px 0', fontSize: 12, lineHeight: '1.4', color: '#334155', fontWeight: n.is_read ? 500 : 700 }}>{n.message}</p>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, color: '#94a3b8' }}>{new Date(n.created_at).toLocaleDateString()}</span>
                               <div style={{ display: 'flex', gap: 10 }}>
-                                {!n.is_read && (
-                                  <button onClick={() => markNotifRead(n.id)} style={{ background: 'transparent', border: 'none', color: '#10b981', fontSize: 10, fontWeight: 800, cursor: 'pointer', padding: 0 }}>
-                                    LEÍDO
-                                  </button>
-                                )}
-                                <button onClick={() => deleteNotif(n.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, opacity: 0.6 }}>
-                                  <Trash2 size={12} />
-                                </button>
+                                {!n.is_read && <button onClick={() => markNotifRead(n.id)} style={{ background: 'transparent', border: 'none', color: '#a2d149', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>LEÍDA</button>}
+                                <button onClick={() => deleteNotif(n.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>ELIMINAR</button>
                               </div>
                             </div>
                           </div>
-                        ))
-                      )}
+                        ))}
+                        {notifications.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>No tienes notificaciones</div>}
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
-
-              <button
-                onClick={logout}
-                className="btn"
-                style={{ background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 5, padding: '10px 16px', borderRadius: 10 }}>
-                <LogOut size={16} /> Salir
+              <button onClick={logout} style={{ background: '#333', color: '#f87171', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: '11px', fontWeight: 800, cursor: 'pointer' }}>
+                SALIR
               </button>
             </div>
-
-            <div className="header" style={{ position: 'relative', zIndex: 1 }}>
-              <img src={logoBody2} alt="Logo" style={{ width: 140, marginBottom: 20, filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.1))' }} />
-              <h1>BODY LOGIC</h1>
-              <p style={{ margin: '-10px 0 10px 0', fontSize: '14px', fontWeight: 700, color: '#a2d149', textTransform: 'uppercase' }}>Resultados diseñados a tu medida</p>
-              <p>CONTROL PANEL | Coach: {user?.name}</p>
-            </div>
-          </>
-        )}
-
-        {/* Tabs Navigation */}
-        {!viewingEmail && !hideTabs && (
-          <div style={{ display: 'flex', gap: 10, marginBottom: 30 }}>
-            <button
-              onClick={() => !isCoachBlocked && setActiveTab('create')}
-              style={{
-                flex: 1, padding: '14px', 
-                background: activeTab === 'create' ? '#2d4739' : '#fff', 
-                color: activeTab === 'create' ? '#fff' : (isCoachBlocked ? '#cbd5e1' : '#2d4739'),
-                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', 
-                cursor: isCoachBlocked ? 'not-allowed' : 'pointer', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: activeTab === 'create' ? '0 8px 16px rgba(0,0,0,0.1)' : '0 2px 5px rgba(0,0,0,0.05)', 
-                transition: 'all 0.2s',
-                opacity: isCoachBlocked ? 0.6 : 1
-              }}>
-              <PlusCircle size={16} /> CREAR RUTINA
-            </button>
-            <button
-              onClick={() => !isCoachBlocked && setActiveTab('users')}
-              style={{
-                flex: 1, padding: '14px', 
-                background: activeTab === 'users' ? '#a2d149' : '#fff', 
-                color: activeTab === 'users' ? '#fff' : (isCoachBlocked ? '#cbd5e1' : '#2d4739'),
-                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', 
-                cursor: isCoachBlocked ? 'not-allowed' : 'pointer', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: activeTab === 'users' ? '0 8px 16px rgba(197,160,33,0.2)' : '0 2px 5px rgba(0,0,0,0.05)', 
-                transition: 'all 0.2s',
-                opacity: isCoachBlocked ? 0.6 : 1
-              }}>
-              <Users size={16} /> VER USUARIOS
-            </button>
-            <button
-              onClick={() => setActiveTab('payments')}
-              style={{
-                flex: 1, padding: '14px', background: activeTab === 'payments' ? '#3b82f6' : '#fff', color: activeTab === 'payments' ? '#fff' : '#2d4739',
-                border: 'none', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: activeTab === 'payments' ? '0 8px 16px rgba(59,130,246,0.2)' : '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
-              }}>
-              <DollarSign size={16} /> GESTIÓN DE PAGOS
-            </button>
           </div>
-        )}
+
+          {/* Sidebar Overlay */}
+          {isMenuOpen && (
+            <div 
+              onClick={() => setIsMenuOpen(false)}
+              style={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0, 
+                background: 'rgba(0,0,0,0.5)', 
+                zIndex: 998,
+                backdropFilter: 'blur(4px)'
+              }} 
+            />
+          )}
+
+          {/* Sidebar Menu */}
+          <div style={{ 
+            position: 'fixed', 
+            top: '70px', 
+            left: isMenuOpen ? 0 : '-300px', 
+            width: '280px', 
+            height: 'calc(100vh - 70px)', 
+            background: '#fff', 
+            zIndex: 999, 
+            transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: '4px 0 15px rgba(0,0,0,0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '20px 0'
+          }}>
+            <div style={{ padding: '0 20px 20px', borderBottom: '1px solid #f1f5f9' }}>
+              <p style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 10px 0' }}>Panel del Coach</p>
+            </div>
+
+            <div style={{ flex: 1, padding: '10px 15px' }}>
+              {[
+                { id: 'create', label: 'CREAR RUTINA', icon: <PlusCircle size={20} /> },
+                { id: 'users', label: 'MIS CLIENTES', icon: <Users size={20} /> },
+                { id: 'payments', label: 'CONTROL DE PAGOS', icon: <DollarSign size={20} /> },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  disabled={tab.id !== 'payments' && isCoachBlocked}
+                  onClick={() => { setActiveTab(tab.id as any); setIsMenuOpen(false); }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '14px 20px',
+                    marginBottom: '8px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    cursor: (tab.id !== 'payments' && isCoachBlocked) ? 'not-allowed' : 'pointer',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    transition: 'all 0.2s',
+                    textAlign: 'left',
+                    background: activeTab === tab.id ? '#f0fdf4' : 'transparent',
+                    color: activeTab === tab.id ? '#2d4739' : (tab.id !== 'payments' && isCoachBlocked ? '#cbd5e1' : '#64748b'),
+                    borderLeft: activeTab === tab.id ? '4px solid #a2d149' : '4px solid transparent',
+                    opacity: (tab.id !== 'payments' && isCoachBlocked) ? 0.6 : 1
+                  }}>
+                  <span style={{ color: activeTab === tab.id ? '#a2d149' : 'inherit' }}>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px' }}>
+                <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#2d4739', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a2d149', fontWeight: 900, fontSize: 14 }}>
+                  {user?.name?.[0].toUpperCase()}
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{user?.name}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: user?.isActive ? '#10b981' : '#ef4444' }}></span>
+                    <p style={{ margin: 0, fontSize: 10, color: '#64748b' }}>{user?.isActive ? 'Plan Activo' : 'Plan Vencido'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div style={{ 
+        paddingTop: hideHeader ? '0' : '100px', 
+        maxWidth: 1400, 
+        margin: '0 auto', 
+        paddingLeft: '20px',
+        paddingRight: '20px',
+        paddingBottom: '40px'
+      }}>
 
         {isCoachBlocked && (
           <div style={{
@@ -729,7 +813,7 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
             <ShieldOff size={24} />
             <div>
               <p style={{ margin: 0 }}>CUENTA DE COACH INACTIVA</p>
-              <p style={{ margin: 0, fontWeight: 500, fontSize: 12 }}>Tu acceso a la gestión de clientes está restringido. Por favor, contacta al administrador.</p>
+              <p style={{ margin: 0, fontWeight: 500, fontSize: 12 }}>Tu acceso a la gestión de clientes está restringido. Por favor, realiza el pago de tu saldo para reactivar tu cuenta.</p>
             </div>
           </div>
         )}
@@ -801,8 +885,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
           </div>
         ) : activeTab === 'users' ? (
           <div style={{ padding: '0 0 20px 0' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '25px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '25px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                 <h2 className="section-title" style={{ margin: 0 }}>Listado de Atletas</h2>
                 { (planFilter !== 'all' || statusFilter !== 'all' || sortOrder !== 'none' || searchQuery !== '') && (
                   <button 
@@ -814,60 +898,94 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
                 )}
               </div>
               
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                {/* Buscador */}
-                <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '10px 16px', borderRadius: 10, border: '2px solid #e2e8f0', flex: '1 1 250px' }}>
+              <div className="search-filters-row" style={{ position: 'relative', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Buscador Full Width */}
+                <div style={{ 
+                  display: 'flex', alignItems: 'center', background: '#fff', 
+                  padding: '8px 14px', borderRadius: 10, border: '2px solid #e2e8f0', 
+                  flex: '1 1 220px', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' 
+                }}>
                   <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
                   <input
                     type="text"
                     placeholder="Buscar por nombre o email..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '13px' }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '15px', fontWeight: 500 }}
                   />
                 </div>
 
-                {/* Filtro Plan */}
-                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: 10, border: '2px solid #e2e8f0' }}>
-                  <Filter size={14} color="#64748b" style={{ marginRight: 8 }} />
-                  <select 
-                    value={planFilter}
-                    onChange={(e) => setPlanFilter(e.target.value)}
-                    style={{ border: 'none', outline: 'none', fontSize: '13px', color: '#475569', fontWeight: 600, background: 'transparent', cursor: 'pointer' }}
-                  >
-                    <option value="all">Todos los Planes</option>
-                    <option value="Mensual">Mensual</option>
-                    <option value="Dos meses">Dos meses</option>
-                    <option value="Trimestral">Trimestral</option>
-                  </select>
-                </div>
+                {/* Unified Filters Button */}
+                <div className="filter-container" style={{ position: 'relative' }}>
+                  <button 
+                    onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                    style={{ 
+                      display: 'flex', alignItems: 'center', gap: 8, background: isFiltersOpen ? '#2d4739' : '#fff', 
+                      color: isFiltersOpen ? '#fff' : '#475569', padding: '12px 20px', borderRadius: 12, 
+                      border: '2px solid', borderColor: isFiltersOpen ? '#2d4739' : '#e2e8f0', 
+                      fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' 
+                    }}>
+                    <Filter size={16} /> 
+                    <span>Filtros</span>
+                    {isFiltersOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
 
-                {/* Filtro Estado */}
-                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: 10, border: '2px solid #e2e8f0' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusFilter === 'active' ? '#10b981' : (statusFilter === 'inactive' ? '#ef4444' : '#cbd5e1'), marginRight: 8 }} />
-                  <select 
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    style={{ border: 'none', outline: 'none', fontSize: '13px', color: '#475569', fontWeight: 600, background: 'transparent', cursor: 'pointer' }}
-                  >
-                    <option value="all">Todos los Estados</option>
-                    <option value="active">Activos</option>
-                    <option value="inactive">Inactivos</option>
-                  </select>
-                </div>
+                  {/* Dropdown Menu */}
+                  {isFiltersOpen && (
+                    <>
+                      <div 
+                        className="filters-overlay"
+                        onClick={() => setIsFiltersOpen(false)}
+                        style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1999, backdropFilter: 'blur(2px)' }} 
+                      />
+                      <div className="filters-dropdown" style={{ 
+                        position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '280px', 
+                        background: '#fff', borderRadius: 16, boxShadow: '0 10px 25px rgba(0,0,0,0.15)', 
+                        padding: '20px', zIndex: 2000, border: '1px solid #e2e8f0',
+                        display: 'flex', flexDirection: 'column', gap: '15px', animation: 'fadeIn 0.2s ease-out'
+                      }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Plan de Suscripción</label>
+                        <select 
+                          value={planFilter}
+                          onChange={(e) => setPlanFilter(e.target.value)}
+                          style={{ width: '100%', padding: '10px', borderRadius: 10, border: '2px solid #f1f5f9', outline: 'none', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}
+                        >
+                          <option value="all">Todos los Planes</option>
+                          <option value="Mensual">Mensual</option>
+                          <option value="Dos meses">Dos meses</option>
+                          <option value="Trimestral">Trimestral</option>
+                        </select>
+                      </div>
 
-                {/* Ordenar Fecha */}
-                <div style={{ display: 'flex', alignItems: 'center', background: '#fff', padding: '6px 12px', borderRadius: 10, border: '2px solid #e2e8f0' }}>
-                  <Calendar size={14} color="#64748b" style={{ marginRight: 8 }} />
-                  <select 
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as any)}
-                    style={{ border: 'none', outline: 'none', fontSize: '13px', color: '#475569', fontWeight: 600, background: 'transparent', cursor: 'pointer' }}
-                  >
-                    <option value="none">Sin Ordenar Fecha</option>
-                    <option value="asc">Fecha Fin: Ascendente</option>
-                    <option value="desc">Fecha Fin: Descendente</option>
-                  </select>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Estado del Atleta</label>
+                        <select 
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          style={{ width: '100%', padding: '10px', borderRadius: 10, border: '2px solid #f1f5f9', outline: 'none', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}
+                        >
+                          <option value="all">Todos los Estados</option>
+                          <option value="active">Activos</option>
+                          <option value="inactive">Inactivos</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Ordenar por Vencimiento</label>
+                        <select 
+                          value={sortOrder}
+                          onChange={(e) => setSortOrder(e.target.value as any)}
+                          style={{ width: '100%', padding: '10px', borderRadius: 10, border: '2px solid #f1f5f9', outline: 'none', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}
+                        >
+                          <option value="none">Sin Ordenar</option>
+                          <option value="asc">Más Próximo Primero</option>
+                          <option value="desc">Más Lejano Primero</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
                 </div>
               </div>
             </div>
@@ -1358,8 +1476,8 @@ const CoachDashboard = ({ preloadedEmail, preloadedRoutine, hideHeader, hideTabs
           </>
         )}
       </div>
+    </div>
     </>
   );
-};
+}
 
-export default CoachDashboard;
