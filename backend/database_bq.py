@@ -130,6 +130,12 @@ class BigQueryDB:
         self.query(sql, params)
         return True
 
+    def get_client_profile(self, user_id):
+        sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.client_profiles` WHERE user_id = @user_id LIMIT 1"
+        params = [bigquery.ScalarQueryParameter("user_id", "INTEGER", user_id)]
+        results = self.query(sql, params)
+        return results[0] if results else None
+
     def get_latest_routine(self, user_id):
         sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.routines` WHERE user_id = @user_id ORDER BY created_at DESC LIMIT 1"
         params = [bigquery.ScalarQueryParameter("user_id", "INTEGER", user_id)]
@@ -223,7 +229,11 @@ class BigQueryDB:
         self.query(sql, params)
         return True
 
-bq_db = BigQueryDB()
+# Inicialización diferida
+_bq_db = None
 
 def get_bq_db():
-    return bq_db
+    global _bq_db
+    if _bq_db is None:
+        _bq_db = BigQueryDB()
+    return _bq_db
