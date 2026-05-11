@@ -1,5 +1,5 @@
 from google.cloud import bigquery
-from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status
+from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Union, Any
@@ -7,8 +7,11 @@ from datetime import datetime, timedelta, timezone
 import os
 import uuid
 import time
-from database_bq import get_bq_db, now_bogota
+from database_bq import get_bq_db, now_bogota, PROJECT_ID
 import auth
+from PIL import Image
+from io import BytesIO
+from google.cloud import storage
 
 app = FastAPI(title="Body Logic BigQuery Server")
 
@@ -66,6 +69,7 @@ class ClientDataReq(BaseModel):
     profile: ClientProfileBase
     coach_id: Optional[int] = None
     isRenewal: Optional[bool] = False
+    is_active: Optional[bool] = None
 
 class PublishAllReq(BaseModel):
     athlete: ClientDataReq
@@ -111,7 +115,8 @@ def google_auth(req: TokenReq):
         "role": user['role'], 
         "name": user['name'], 
         "email": user['email'], 
-        "is_active": bool(user['is_active'])
+        "is_active": bool(user['is_active']),
+        "profile_picture_url": user.get('profile_picture_url')
     }
 
 # ====================
@@ -208,6 +213,29 @@ def publish_all(req: PublishAllReq, current_user=Depends(auth.get_current_active
         db.create_payment(current_user.id, user['id'], user['name'], 20000, req.athlete.profile.planType)
 
     return {"status": "success", "message": "Todo guardado en BigQuery"}
+
+@app.post("/api/admin/renew-plan")
+def renew_athlete_plan(req: ClientDataReq, current_user=Depends(auth.get_current_user)):
+    db = get_bq_db()
+    user = db.get_user_by_email(req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # 1. Actualizar el perfil del cliente
+    db.save_client_profile(user['id'], req.profile.dict())
+    
+    # 2. Si es una renovación, crear el registro de pago para el coach
+    # Usamos el coach_id del atleta o el del usuario actual si es un coach
+    coach_id = user.get('coach_id') or (current_user.id if current_user.role == 'Coach' else None)
+    
+    if coach_id:
+        db.create_payment(coach_id, user['id'], user['name'], 20000, req.profile.planType)
+        
+    # 3. Actualizar el estado de actividad si se envió
+    if req.is_active is not None:
+        db.update_user_status(user['id'], req.is_active)
+    
+    return {"status": "success", "message": "Plan renovado exitosamente"}
 
 @app.get("/api/coach/routine/{client_email}")
 def get_client_routine_by_coach(client_email: str, current_user=Depends(auth.get_current_active_coach)):
@@ -319,7 +347,7 @@ def delete_notification(notif_id: int, current_user=Depends(auth.get_current_use
 def get_coach_payments(current_user=Depends(auth.get_current_active_coach)):
     db = get_bq_db()
     payments = db.get_payments(coach_id=current_user.id)
-    return [{"id": p['id'], "client_name": p['client_name'], "amount": p['amount'], "status": p['status'], "date": p['created_at'].strftime("%d/%m/%Y")} for p in payments]
+    return [{"id": p['id'], "client_name": p['client_name'], "plan_type": p.get('plan_type', 'Mensual'), "amount": p['amount'], "status": p['status'], "date": p['created_at'].strftime("%d/%m/%Y")} for p in payments]
 
 @app.post("/api/coach/payments/pay")
 def pay_balance(current_user=Depends(auth.get_current_active_coach)):
@@ -328,10 +356,73 @@ def pay_balance(current_user=Depends(auth.get_current_active_coach)):
     db.pay_balance(current_user.id, batch_id)
     return {"message": "Pagado", "batch_id": batch_id}
 
-@app.get("/api/admin/payments")
-def get_admin_payments(current_user=Depends(auth.get_current_active_admin)):
+@app.get("/api/coach/payments/history")
+def get_coach_payment_history(current_user=Depends(auth.get_current_active_coach)):
     db = get_bq_db()
-    return db.get_payments(is_admin=True)
+    return db.get_payment_batches(coach_id=current_user.id)
+
+@app.get("/api/admin/payments")
+def get_admin_payments(status: Optional[str] = None, current_user=Depends(auth.get_current_active_admin)):
+    db = get_bq_db()
+    if status == 'Paid':
+        return db.get_payment_batches()
+    return db.get_payments(is_admin=True, status=status)
+
+@app.delete("/api/admin/payments/{payment_id}")
+def cancel_payment(payment_id: int, current_user=Depends(auth.get_current_active_admin)):
+    db = get_bq_db()
+    db.cancel_payment(payment_id)
+    return {"status": "success", "message": "Cobro anulado"}
+
+# ====================
+# Profile Picture Endpoints
+# ====================
+def upload_to_gcs(file_content: bytes, filename: str):
+    """Sube una imagen a Google Cloud Storage y la hace pública."""
+    BUCKET_NAME = "body-web-profile-pictures"
+    storage_client = storage.Client(project=PROJECT_ID)
+    
+    # Intentar obtener el bucket, si no existe crearlo (opcional, mejor si ya existe)
+    try:
+        bucket = storage_client.get_bucket(BUCKET_NAME)
+    except:
+        bucket = storage_client.create_bucket(BUCKET_NAME, location="us-central1")
+        # Hacerlo público (opcional, según política de GCP)
+        bucket.make_public(recursive=True, future=True)
+
+    blob = bucket.blob(filename)
+    blob.upload_from_string(file_content, content_type="image/webp")
+    return blob.public_url
+
+@app.post("/api/user/profile-picture")
+async def upload_profile_picture(
+    file: UploadFile = File(...), 
+    current_user=Depends(auth.get_current_user)
+):
+    try:
+        # 1. Leer imagen
+        contents = await file.read()
+        image = Image.open(BytesIO(contents))
+
+        # 2. Convertir a WebP
+        webp_io = BytesIO()
+        image.save(webp_io, format="WEBP", quality=80)
+        webp_content = webp_io.getvalue()
+
+        # 3. Nombre de archivo fijo por usuario para sobrescribir (evita acumular basura)
+        filename = f"avatars/{current_user.id}.webp"
+
+        # 4. Subir a GCS (Sobrescribe si ya existe)
+        public_url = upload_to_gcs(webp_content, filename)
+
+        # 5. Actualizar BigQuery
+        db = get_bq_db()
+        db.update_profile_picture(current_user.id, public_url)
+
+        return {"status": "success", "url": public_url}
+    except Exception as e:
+        print(f"Error uploading profile picture: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar la imagen: {str(e)}")
 
 @app.get("/")
 def read_root():

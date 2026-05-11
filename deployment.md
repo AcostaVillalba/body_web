@@ -54,6 +54,37 @@ The backend is containerized using Docker and deployed to **Google Cloud Run**. 
 
 ---
 
+## ⚙️ Jobs Deployment (Cloud Run Jobs)
+
+The automated payment verification system is deployed as a **Cloud Run Job**. Unlike the backend, this is not a web service and is triggered manually or by a schedule.
+
+### 📍 Configuration Details
+- **Job Name:** `proceso-cobros`
+- **Region:** `us-central1`
+- **Schedule:** Suggested hourly via Cloud Scheduler.
+
+### 🚀 Deployment Steps
+
+1. **Deploy the Job:**
+   Navigate to the `jobs` directory and run:
+   ```bash
+   cd jobs
+   gcloud run jobs deploy proceso-cobros --source . --region us-central1
+   ```
+
+2. **Execute Manually (Testing):**
+   ```bash
+   gcloud run jobs execute proceso-cobros --region us-central1
+   ```
+
+3. **Schedule the Job:**
+   Use Cloud Scheduler to trigger the job.
+   - **Frequency:** `0 * * * *` (Hourly)
+   - **Target:** Cloud Run Job
+   - **Job Name:** `proceso-cobros`
+
+---
+
 ## 🌐 Frontend Deployment (Firebase Hosting)
 
 The frontend is a Vite application deployed to **Firebase Hosting**.
@@ -78,7 +109,7 @@ The frontend is a Vite application deployed to **Firebase Hosting**.
 
 3. **Deploy to Hosting:**
    ```bash
-   npx firebase-tools deploy --only hosting
+   npx firebase-tools deploy --only hosting --project body-web-491923
    ```
 
 ### 🔍 Useful Firebase Commands
@@ -99,3 +130,6 @@ After deploying both components:
 > [!TIP]
 > **Scaling & Costs**
 > This setup is designed to be **free or very low cost** for development. Scaling to zero ensures you only pay for the exact milliseconds your code is running.
+
+## backend local
+.venv\Scripts\activate; uvicorn main:app --reload

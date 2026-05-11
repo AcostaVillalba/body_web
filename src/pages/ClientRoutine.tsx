@@ -4,6 +4,7 @@ import { LogOut, ChevronDown, ChevronUp, History, X, Bell, Menu, User, Award, In
 import logoBody2 from '../assets/logobody2.png';
 import { EXERCISES_DB, getImageUrl } from '../data';
 import ExerciseImage from '../components/ExerciseImage';
+import AvatarUpload from '../components/AvatarUpload';
 import API_URL from '../api';
 
 const ClientRoutine = () => {
@@ -249,9 +250,27 @@ const ClientRoutine = () => {
             <div style={{ 
                 position: 'fixed', top: '70px', left: isMenuOpen ? 0 : '-300px', width: '280px', height: 'calc(100vh - 70px)', 
                 background: '#fff', zIndex: 1200, transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-                boxShadow: '4px 0 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', padding: '20px 0' 
+                boxShadow: '4px 0 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', padding: '0' 
             }}>
-                <div style={{ flex: 1, padding: '10px 15px' }}>
+                <div style={{ 
+                    padding: '30px 20px', 
+                    background: '#f8fafc', 
+                    textAlign: 'center', 
+                    borderBottom: '1px solid #f1f5f9' 
+                }}>
+                    <AvatarUpload 
+                        currentAvatar={user?.profile_picture_url} 
+                        onUploadSuccess={(url) => console.log("New avatar:", url)} 
+                    />
+                    <h3 style={{ margin: '15px 0 0 0', fontSize: '16px', fontWeight: 900, color: '#2d4739' }}>
+                        {user?.name}
+                    </h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                        Atleta Body Logic
+                    </p>
+                </div>
+
+                <div style={{ flex: 1, padding: '20px 15px' }}>
                     {[
                         { id: 'routine', label: 'MI RUTINA', icon: <BookOpen size={20} /> },
                         { id: 'profile', label: 'MI PERFIL', icon: <User size={20} /> },
@@ -274,9 +293,8 @@ const ClientRoutine = () => {
                         </button>
                     ))}
                 </div>
-                <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
-                    <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>{user?.name}</p>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '10px', color: '#64748b' }}>{user?.email}</p>
+                <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'center', background: '#f8fafc' }}>
+                    <p style={{ margin: 0, fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{user?.email}</p>
                 </div>
             </div>
 
@@ -708,7 +726,7 @@ const ClientRoutine = () => {
                             <circle cx="12" cy="12" r="4" stroke="#a2d149" strokeWidth="2" />
                             <circle cx="17.5" cy="6.5" r="1.2" fill="#a2d149" />
                         </svg>
-                        @jefeandrea
+                        @bodylogicapp
                     </a>
                 </div>
 
