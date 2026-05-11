@@ -60,7 +60,8 @@ class BigQueryDB:
             "is_active": True,
             "coach_id": coach_id,
             "phone": None,
-            "instagram": None
+            "instagram": None,
+            "profile_picture_url": None
         }
         if self.insert("users", user_row):
             return user_row
@@ -194,16 +195,100 @@ class BigQueryDB:
         }
         return self.insert("notifications", row)
 
-    def get_payments(self, coach_id=None, is_admin=False):
+    def get_payments(self, coach_id=None, is_admin=False, status=None):
         if is_admin:
-            sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.payments` WHERE status = 'Paid' ORDER BY created_at DESC"
+            sql = f"""
+                SELECT p.*, u.name as coach_name 
+                FROM `{PROJECT_ID}.{DATASET_ID}.payments` p
+                LEFT JOIN `{PROJECT_ID}.{DATASET_ID}.users` u ON p.coach_id = u.id
+                WHERE 1=1
+            """
             params = []
+            if status:
+                sql += " AND p.status = @status"
+                params.append(bigquery.ScalarQueryParameter("status", "STRING", status))
+            sql += " ORDER BY p.created_at DESC"
         else:
-            sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.payments` WHERE coach_id = @coach_id ORDER BY created_at DESC"
+            sql = f"""
+                SELECT p.*, u.name as coach_name 
+                FROM `{PROJECT_ID}.{DATASET_ID}.payments` p
+                LEFT JOIN `{PROJECT_ID}.{DATASET_ID}.users` u ON p.coach_id = u.id
+                WHERE p.coach_id = @coach_id
+            """
             params = [bigquery.ScalarQueryParameter("coach_id", "INTEGER", coach_id)]
+            if status:
+                sql += " AND p.status = @status"
+                params.append(bigquery.ScalarQueryParameter("status", "STRING", status))
+            sql += " ORDER BY p.created_at DESC"
+        return self.query(sql, params)
+
+    def get_payment_batches(self, coach_id=None):
+        sql = f"""
+            SELECT 
+                p.batch_id, 
+                u_coach.name as coach_name, 
+                COUNT(*) as clients_count, 
+                SUM(p.amount) as total_amount, 
+                FORMAT_TIMESTAMP('%d/%m/%Y', COALESCE(MAX(p.paid_at), MAX(p.created_at))) as date,
+                ARRAY_AGG(STRUCT(
+                    p.client_name as name, 
+                    u_client.email as email,
+                    p.plan_type, 
+                    p.amount, 
+                    cp.start_date, 
+                    cp.end_date,
+                    FORMAT_TIMESTAMP('%d/%m/%Y', p.created_at) as reg_date,
+                    IF(
+                        (SELECT COUNT(*) FROM `{PROJECT_ID}.{DATASET_ID}.payments` p2 
+                         WHERE p2.client_id = p.client_id 
+                         AND p2.status = 'Paid' 
+                         AND p2.created_at < p.created_at) = 0,
+                        'Nuevo', 'Renovación'
+                    ) as tramite
+                )) as clients
+            FROM `{PROJECT_ID}.{DATASET_ID}.payments` p
+            LEFT JOIN `{PROJECT_ID}.{DATASET_ID}.users` u_coach ON p.coach_id = u_coach.id
+            LEFT JOIN `{PROJECT_ID}.{DATASET_ID}.users` u_client ON p.client_id = u_client.id
+            LEFT JOIN `{PROJECT_ID}.{DATASET_ID}.client_profiles` cp ON p.client_id = cp.user_id
+            WHERE p.status = 'Paid' AND p.batch_id IS NOT NULL
+        """
+        params = []
+        if coach_id:
+            sql += " AND p.coach_id = @coach_id "
+            params.append(bigquery.ScalarQueryParameter("coach_id", "INTEGER", coach_id))
+            
+        sql += """
+            GROUP BY p.batch_id, coach_name
+            ORDER BY COALESCE(MAX(p.paid_at), MAX(p.created_at)) DESC
+        """
         return self.query(sql, params)
 
     def create_payment(self, coach_id, client_id, client_name, amount, plan_type):
+        # 1. Buscar si ya existe un cobro PENDIENTE para este atleta con este coach
+        sql = f"SELECT id FROM `{PROJECT_ID}.{DATASET_ID}.payments` WHERE coach_id = @coach_id AND client_id = @client_id AND status = 'Pending' LIMIT 1"
+        params = [
+            bigquery.ScalarQueryParameter("coach_id", "INTEGER", coach_id),
+            bigquery.ScalarQueryParameter("client_id", "INTEGER", client_id)
+        ]
+        existing = self.query(sql, params)
+
+        if existing:
+            # 2. Si existe, actualizamos la información (por si cambió el monto o plan_type)
+            # Y actualizamos la fecha para que sepa que se 'renovó' hoy (corrige error de dedo)
+            sql_update = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.payments` SET " \
+                         f"amount=@amount, plan_type=@plan_type, created_at=@created_at, client_name=@client_name " \
+                         f"WHERE id=@id"
+            update_params = [
+                bigquery.ScalarQueryParameter("amount", "INTEGER", amount),
+                bigquery.ScalarQueryParameter("plan_type", "STRING", plan_type),
+                bigquery.ScalarQueryParameter("created_at", "TIMESTAMP", now_bogota()),
+                bigquery.ScalarQueryParameter("client_name", "STRING", client_name),
+                bigquery.ScalarQueryParameter("id", "INTEGER", existing[0]['id'])
+            ]
+            self.query(sql_update, update_params)
+            return True
+
+        # 3. Si no existe, crear uno nuevo
         new_id = int(time.time() * 1000) % 2147483647
         row = {
             "id": new_id,
@@ -218,13 +303,30 @@ class BigQueryDB:
         }
         return self.insert("payments", row)
 
+    def cancel_payment(self, payment_id):
+        # En lugar de eliminar, marcamos como Cancelled para trazabilidad
+        sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.payments` SET status = 'Cancelled' WHERE id = @id"
+        params = [bigquery.ScalarQueryParameter("id", "INTEGER", payment_id)]
+        self.query(sql, params)
+        return True
+
     def pay_balance(self, coach_id, batch_id):
         # 1. Update payments
-        sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.payments` SET status = 'Paid', batch_id = @batch_id " \
+        sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.payments` SET status = 'Paid', batch_id = @batch_id, paid_at = @paid_at " \
               f"WHERE coach_id = @coach_id AND status = 'Pending'"
         params = [
             bigquery.ScalarQueryParameter("batch_id", "STRING", batch_id),
-            bigquery.ScalarQueryParameter("coach_id", "INTEGER", coach_id)
+            bigquery.ScalarQueryParameter("coach_id", "INTEGER", coach_id),
+            bigquery.ScalarQueryParameter("paid_at", "TIMESTAMP", now_bogota())
+        ]
+        self.query(sql, params)
+        return True
+
+    def update_profile_picture(self, user_id, url):
+        sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.users` SET profile_picture_url = @url WHERE id = @id"
+        params = [
+            bigquery.ScalarQueryParameter("url", "STRING", url),
+            bigquery.ScalarQueryParameter("id", "INTEGER", user_id)
         ]
         self.query(sql, params)
         return True

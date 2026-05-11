@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { EXERCISES_DB, getImageUrl, preloadImage } from '../data';
-import { Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign, Filter, RotateCcw, Bell, Menu, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign, Filter, RotateCcw, Bell, Menu, X, ChevronDown, ChevronUp, FileText, Shield } from 'lucide-react';
 import '../App.css';
 import logoBody2 from '../assets/logobody2.png';
 import ExerciseImage from '../components/ExerciseImage';
+import AvatarUpload from '../components/AvatarUpload';
 import API_URL from '../api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Download } from 'lucide-react';
 
 interface ExerciseSubRow {
   id: string;
@@ -56,7 +60,8 @@ export interface CoachDashboardProps {
 
 export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideHeader, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) {
   const { token, logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'create' | 'users' | 'payments'>(preloadedEmail ? 'create' : 'create');
+  const [activeTab, setActiveTab] = useState<'create' | 'users' | 'payments' | 'payment_history'>(preloadedEmail ? 'create' : 'create');
+  console.log("CoachDashboard V2 Loaded, Tab:", activeTab);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isReadOnly, setIsReadOnly] = useState(propIsReadOnly || false);
@@ -281,6 +286,9 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     }
   };
 
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+
   const fetchPayments = async () => {
     try {
       const res = await fetch(`${API_URL}/api/coach/payments`, { headers: authHeaders });
@@ -288,8 +296,63 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     } catch (e) { console.error("Error fetching payments", e); }
   };
 
+  const fetchPaymentHistory = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/coach/payments/history`, { headers: authHeaders });
+      if (res.ok) setPaymentHistory(await res.json());
+    } catch (e) { console.error("Error fetching payment history", e); }
+  };
+
+  const downloadInvoice = (batch: any) => {
+    const doc = new jsPDF();
+    doc.setFillColor(45, 71, 57);
+    doc.rect(0, 0, 210, 45, 'F');
+    try { doc.addImage(logoBody2, 'PNG', 15, 10, 25, 25); } catch (e) {}
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FACTURA DE LIQUIDACION', 110, 22, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('BODY LOGIC - CONTROL DE PAGOS', 110, 32, { align: 'center' });
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORMACION DEL COACH', 15, 60);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nombre: ${batch.coach_name}`, 15, 67);
+    doc.text(`ID de Lote: ${batch.batch_id}`, 15, 73);
+    doc.text(`Fecha de Pago: ${batch.date}`, 15, 79);
+
+    autoTable(doc, {
+      startY: 90,
+      head: [['ATLETA / CORREO', 'TRAMITE', 'PLAN', 'PERIODO', 'FECHA REG.', 'MONTO']],
+      body: batch.clients.map((c: any) => [
+        `${c.name}\n${c.email || ''}`,
+        c.tramite || 'Nuevo',
+        c.plan_type,
+        `${c.start_date} - ${c.end_date}`,
+        c.reg_date || batch.date,
+        `$${c.amount.toLocaleString()}`
+      ]),
+      styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [45, 71, 57], textColor: [255, 255, 255], fontStyle: 'bold' },
+      foot: [['', '', '', '', 'TOTAL PAGADO', `$${batch.total_amount.toLocaleString()}`]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [45, 71, 57], fontStyle: 'bold' },
+      theme: 'striped',
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 150;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Este documento sirve como comprobante de pago realizado por el coach a Body Logic.', 105, finalY + 20, { align: 'center' });
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 105, finalY + 27, { align: 'center' });
+    doc.save(`Factura_${batch.coach_name}_${batch.date.replace(/\//g, '-')}.pdf`);
+  };
+
   useEffect(() => {
     if (activeTab === 'payments') fetchPayments();
+    if (activeTab === 'payment_history') fetchPaymentHistory();
   }, [activeTab]);
 
   const handlePayBalance = async () => {
@@ -381,11 +444,19 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     if (!athlete.email) return;
     setIsLoading(true);
     setStatusMsg({ type: '', text: '' });
+
     try {
-      const res = await fetch(`${API_URL}/api/coach/clients`, {
+      // Logic: If startDate <= today, then is_active = true
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const start = new Date(athlete.profile.startDate + 'T12:00:00');
+      start.setHours(0, 0, 0, 0);
+      const shouldBeActive = start <= today;
+
+      const res = await fetch(`${API_URL}/api/admin/renew-plan`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({ ...athlete, isRenewal: true })
+        body: JSON.stringify({ ...athlete, is_active: shouldBeActive })
       });
       
       if (res.status === 403) {
@@ -541,12 +612,19 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     setStatusMsg({ type: '', text: '' });
 
     try {
+      // Logic: If startDate <= today, then is_active = true
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const start = new Date(athlete.profile.startDate + 'T12:00:00');
+      start.setHours(0, 0, 0, 0);
+      const shouldBeActive = start <= today;
+
       // Unificamos el guardado de perfil y rutina en una sola petición atómica
       const res = await fetch(`${API_URL}/api/coach/publish-all`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
-          athlete: { ...athlete, isRenewal: isRenewalActive },
+          athlete: { ...athlete, is_active: shouldBeActive, isRenewal: isRenewalActive },
           routine_data: JSON.stringify(routineDays)
         })
       });
@@ -739,8 +817,25 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
             flexDirection: 'column',
             padding: '20px 0'
           }}>
-            <div style={{ padding: '0 20px 20px', borderBottom: '1px solid #f1f5f9' }}>
-              <p style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 10px 0' }}>Panel del Coach</p>
+            <div style={{ 
+                padding: '30px 20px', 
+                background: '#f8fafc', 
+                textAlign: 'center', 
+                borderBottom: '1px solid #f1f5f9' 
+            }}>
+                <AvatarUpload 
+                    currentAvatar={user?.profile_picture_url} 
+                    onUploadSuccess={(url) => console.log("New avatar:", url)} 
+                />
+                <h3 style={{ margin: '15px 0 0 0', fontSize: '16px', fontWeight: 900, color: '#2d4739' }}>
+                    {user?.name}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 5 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: user?.isActive ? '#10b981' : '#ef4444' }}></span>
+                    <p style={{ margin: 0, fontSize: '10px', color: '#64748b', fontWeight: 600 }}>
+                        {user?.isActive ? 'COACH ACTIVO' : 'COACH INACTIVO'}
+                    </p>
+                </div>
             </div>
 
             <div style={{ flex: 1, padding: '10px 15px' }}>
@@ -748,6 +843,7 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                 { id: 'create', label: 'CREAR RUTINA', icon: <PlusCircle size={20} /> },
                 { id: 'users', label: 'MIS CLIENTES', icon: <Users size={20} /> },
                 { id: 'payments', label: 'CONTROL DE PAGOS', icon: <DollarSign size={20} /> },
+                { id: 'payment_history', label: 'HISTORIAL DE PAGOS', icon: <FileText size={20} /> },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -778,19 +874,8 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
               ))}
             </div>
 
-            <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px' }}>
-                <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#2d4739', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a2d149', fontWeight: 900, fontSize: 14 }}>
-                  {user?.name?.[0].toUpperCase()}
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{user?.name}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: user?.isActive ? '#10b981' : '#ef4444' }}></span>
-                    <p style={{ margin: 0, fontSize: 10, color: '#64748b' }}>{user?.isActive ? 'Plan Activo' : 'Plan Vencido'}</p>
-                  </div>
-                </div>
-              </div>
+            <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'center', background: '#f8fafc' }}>
+                <p style={{ margin: 0, fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{user?.email}</p>
             </div>
           </div>
         </>
@@ -824,7 +909,7 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
             <div style={{ background: '#fff', borderRadius: 12, padding: 25, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 30 }}>
                 <div style={{ background: '#fee2e2', padding: 20, borderRadius: 12, border: '1px solid #fecaca' }}>
-                  <p style={{ margin: 0, fontSize: 12, color: '#ef4444', fontWeight: 800, textTransform: 'uppercase' }}>Saldo Pendiente</p>
+                  <p style={{ margin: 0, fontSize: 12, color: '#ef4444', fontWeight: 800, textTransform: 'uppercase' }}>Saldo Pendiente (Solo Pendientes)</p>
                   <p style={{ margin: '5px 0 0 0', fontSize: 24, fontWeight: 900, color: '#991b1b' }}>
                     ${payments.filter(p => p.status === 'Pending').reduce((acc, p) => acc + p.amount, 0).toLocaleString()}
                   </p>
@@ -843,7 +928,7 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                     </tr>
                   </thead>
                   <tbody>
-                    {payments.map(p => (
+                    {payments.filter(p => p.status === 'Pending').map(p => (
                       <tr key={p.id} style={{ borderBottom: '1px solid #f8fafc' }}>
                         <td style={{ padding: '15px 10px', fontSize: 12, color: '#64748b' }}>{p.date}</td>
                         <td style={{ padding: '15px 10px', fontWeight: 700, fontSize: 14 }}>{p.client_name}</td>
@@ -856,14 +941,23 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                         <td style={{ padding: '15px 10px', textAlign: 'right' }}>
                           <span style={{
                             padding: '4px 10px', borderRadius: 20, fontSize: '10px', fontWeight: 800,
-                            background: p.status === 'Paid' ? '#dcfce7' : '#fee2e2',
-                            color: p.status === 'Paid' ? '#166534' : '#991b1b'
+                            background: '#fee2e2',
+                            color: '#991b1b'
                           }}>
-                            {p.status === 'Paid' ? 'PAGADO' : 'PENDIENTE'}
+                            PENDIENTE
                           </span>
                         </td>
                       </tr>
                     ))}
+                    {payments.filter(p => p.status === 'Pending').length === 0 && (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '40px 0', textAlign: 'center' }}>
+                          <div style={{ color: '#10b981', marginBottom: 10 }}><Shield size={40} /></div>
+                          <p style={{ margin: 0, fontWeight: 700, color: '#2d4739' }}>¡Estás al día!</p>
+                          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No tienes saldos pendientes por liquidar.</p>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1036,6 +1130,45 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        ) : activeTab === 'payment_history' ? (
+          <div style={{ padding: '0 0 20px 0' }} id="coach-payment-history-view">
+            <h2 className="section-title">Historial de Pagos y Facturas</h2>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 25, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #f1f5f9', color: '#64748b', fontSize: '11px', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '12px 10px' }}>Fecha</th>
+                      <th style={{ padding: '12px 10px' }}>Atletas</th>
+                      <th style={{ padding: '12px 10px' }}>Monto Total</th>
+                      <th style={{ padding: '12px 10px', textAlign: 'right' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentHistory.map((batch, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
+                        <td style={{ padding: '15px 10px', fontSize: 13, color: '#64748b' }}>{batch.date}</td>
+                        <td style={{ padding: '15px 10px', fontWeight: 700 }}>{batch.clients_count} atletas</td>
+                        <td style={{ padding: '15px 10px', fontWeight: 700, color: '#10b981' }}>${batch.total_amount.toLocaleString()}</td>
+                        <td style={{ padding: '15px 10px', textAlign: 'right' }}>
+                          <button 
+                            onClick={() => setSelectedBatch(batch)}
+                            style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '8px 15px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <FileText size={14} /> VER FACTURA
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {paymentHistory.length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No tienes pagos registrados aún</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         ) : (
@@ -1270,7 +1403,18 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                     dEnd.setDate(dEnd.getDate() + days);
                     const newEnd = dEnd.toISOString().split('T')[0];
 
-                    setAthlete({ ...athlete, profile: { ...athlete.profile, startDate: newStart, endDate: newEnd, controlDate: newControl } });
+                    // Auto-calculate is_active status
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const start = new Date(newStart + 'T12:00:00');
+                    start.setHours(0, 0, 0, 0);
+                    const shouldBeActive = start <= today;
+
+                    setAthlete({ 
+                      ...athlete, 
+                      is_active: shouldBeActive,
+                      profile: { ...athlete.profile, startDate: newStart, endDate: newEnd, controlDate: newControl } 
+                    });
                   }}
                 />
               </div>
@@ -1279,8 +1423,8 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                 <input
                   type="date"
                   value={athlete.profile.endDate}
-                  disabled={isReadOnly || isCoachBlocked || isContractLocked}
-                  style={(isReadOnly || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
+                  disabled={isReadOnly || isCoachBlocked || isContractLocked || user?.role === 'Coach'}
+                  style={(isReadOnly || isCoachBlocked || isContractLocked || user?.role === 'Coach') ? lockedStyle : {}}
                   onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, endDate: e.target.value } })}
                 />
               </div>
@@ -1474,6 +1618,69 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
               </div>
             )}
           </>
+        )}
+
+        {/* MODAL DETALLES PAGO (Coach) */}
+        {selectedBatch && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 }}>
+            <div style={{ background: '#fff', padding: 30, borderRadius: 16, width: '100%', maxWidth: 700, boxShadow: '0 20px 40px rgba(0,0,0,0.2)', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: 15, marginBottom: 20 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Factura de Liquidación</h3>
+                  <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Fecha: {selectedBatch.date}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedBatch(null)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '9px', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '12px 15px' }}>Atleta / Correo</th>
+                      <th style={{ padding: '12px 15px' }}>Trámite</th>
+                      <th style={{ padding: '12px 15px' }}>Plan</th>
+                      <th style={{ padding: '12px 15px' }}>Periodo</th>
+                      <th style={{ padding: '12px 15px', textAlign: 'right' }}>Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedBatch.clients.map((c: any, i: number) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 15px' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{c.name}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{c.email}</div>
+                        </td>
+                        <td style={{ padding: '12px 15px' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: c.tramite === 'Nuevo' ? '#0891b2' : '#9333ea', background: c.tramite === 'Nuevo' ? '#ecfeff' : '#faf5ff', padding: '2px 8px', borderRadius: 12 }}>
+                            {c.tramite || 'Nuevo'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 15px', fontSize: 12 }}>{c.plan_type}</td>
+                        <td style={{ padding: '12px 15px', fontSize: 11, color: '#64748b' }}>{c.start_date} al {c.end_date}</td>
+                        <td style={{ padding: '12px 15px', fontSize: 13, fontWeight: 800, textAlign: 'right', color: '#10b981' }}>${c.amount.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div style={{ marginTop: 20, paddingTop: 15, borderTop: '2px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button 
+                  onClick={() => downloadInvoice(selectedBatch)}
+                  style={{ background: '#2d4739', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                  <Download size={18} /> DESCARGAR PDF
+                </button>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#475569', display: 'block' }}>TOTAL PAGADO</span>
+                  <span style={{ fontSize: 24, fontWeight: 900, color: '#2d4739' }}>${selectedBatch.total_amount.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

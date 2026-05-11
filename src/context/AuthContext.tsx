@@ -7,6 +7,7 @@ interface User {
   email: string;
   role: Role;
   isActive: boolean;
+  profile_picture_url?: string;
 }
 
 interface AuthContextType {
@@ -14,6 +15,7 @@ interface AuthContextType {
   token: string | null;
   login: (token: string, user: User) => void;
   logout: () => void;
+  updateProfilePicture: (url: string) => void;
   isAuthenticated: boolean;
 }
 
@@ -47,8 +49,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('user');
   };
 
+  const updateProfilePicture = (url: string) => {
+    if (user) {
+      const updatedUser = { ...user, profile_picture_url: url };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateProfilePicture, isAuthenticated: !!token }}>
       {children}
     </AuthContext.Provider>
   );

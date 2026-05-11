@@ -1,20 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight, DollarSign, FileText, Menu } from 'lucide-react';
+import { Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight, DollarSign, FileText, Menu, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import CoachDashboard, { type RoutineDay } from './CoachDashboard';
 import '../App.css';
 import logoBody2 from '../assets/logobody2.png';
 import API_URL from '../api';
 import { getImageUrl } from '../data';
+import AvatarUpload from '../components/AvatarUpload';
 
 const AdminDashboard = () => {
   const { token, logout, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'create' | 'coaches' | 'payments'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'create' | 'coaches' | 'pending_payments' | 'payment_history'>('users');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddingCoach, setIsAddingCoach] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [coachesList, setCoachesList] = useState<any[]>([]); // Para la pestaña de gestión
   const [adminPayments, setAdminPayments] = useState<any[]>([]);
+  const [pendingPayments, setPendingPayments] = useState<any[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<any | null>(null);
   const [newCoach, setNewCoach] = useState({ name: '', email: '', phone: '', instagram: '' });
   const [editingClientEmail, setEditingClientEmail] = useState<string | null>(null);
@@ -22,6 +26,8 @@ const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingCoachId, setEditingCoachId] = useState<number | null>(null); // Nuevo estado para editar coaches
   const [searchQuery, setSearchQuery] = useState('');
+  const [pendingSearchQuery, setPendingSearchQuery] = useState('');
+  const [pendingCoachFilter, setPendingCoachFilter] = useState('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
@@ -59,20 +65,100 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'payments') fetchAdminPayments();
+    if (activeTab === 'payment_history') {
+      fetchAdminPayments();
+    }
+    if (activeTab === 'pending_payments') {
+      fetchPendingPayments();
+    }
   }, [activeTab]);
 
   const fetchAdminPayments = async () => {
     try {
-      console.log("DEBUG: Fetching admin payments from", `${API_URL}/api/admin/payments`);
-      const res = await fetch(`${API_URL}/api/admin/payments`, { headers: authHeaders });
-      console.log("DEBUG: Response status (payments):", res.status);
+      const res = await fetch(`${API_URL}/api/admin/payments?status=Paid`, { headers: authHeaders });
+      if (res.ok) setAdminPayments(await res.json());
+    } catch (e) { console.error("Error fetching admin payments", e); }
+  };
+
+  const fetchPendingPayments = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/payments?status=Pending`, { headers: authHeaders });
+      if (res.ok) setPendingPayments(await res.json());
+    } catch (e) { console.error("Error fetching pending payments", e); }
+  };
+
+  const downloadInvoice = (batch: any) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFillColor(45, 71, 57); // #2d4739
+    doc.rect(0, 0, 210, 45, 'F');
+    
+    // Logo (if available)
+    try {
+      doc.addImage(logoBody2, 'PNG', 15, 10, 25, 25);
+    } catch (e) {
+      console.warn("Logo could not be added to PDF", e);
+    }
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FACTURA DE LIQUIDACION', 110, 22, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('BODY LOGIC - CONTROL DE PAGOS', 110, 32, { align: 'center' });
+
+    // Coach Info
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORMACION DEL COACH', 15, 60);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nombre: ${batch.coach_name}`, 15, 67);
+    doc.text(`ID de Lote: ${batch.batch_id || 'N/A'}`, 15, 73);
+    doc.text(`Fecha de Pago: ${batch.date}`, 15, 79);
+
+    // Summary Table
+    autoTable(doc, {
+      startY: 90,
+      head: [['ATLETA / CORREO', 'TRAMITE', 'PLAN', 'PERIODO', 'FECHA REG.', 'MONTO']],
+      body: batch.clients.map((c: any) => [
+        `${c.name}\n${c.email || ''}`,
+        c.tramite || 'Nuevo',
+        c.plan_type,
+        `${c.start_date} - ${c.end_date}`,
+        c.reg_date || batch.date,
+        `$${c.amount.toLocaleString()}`
+      ]),
+      styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [45, 71, 57], textColor: [255, 255, 255], fontStyle: 'bold' },
+      foot: [['', '', '', '', 'TOTAL PAGADO', `$${batch.total_amount.toLocaleString()}`]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [45, 71, 57], fontStyle: 'bold' },
+      theme: 'striped',
+    });
+
+    // Footer
+    const finalY = (doc as any).lastAutoTable.finalY || 150;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Este documento sirve como comprobante de pago realizado por el coach a Body Logic.', 105, finalY + 20, { align: 'center' });
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 105, finalY + 27, { align: 'center' });
+
+    doc.save(`Factura_${batch.coach_name}_${batch.date.replace(/\//g, '-')}.pdf`);
+  };
+
+  const handleCancelPayment = async (paymentId: number) => {
+    if (!confirm("¿Estás seguro de anular este cobro? Esta acción no se puede deshacer y quedará registrado como Cancelado.")) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/payments/${paymentId}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
       if (res.ok) {
-        const data = await res.json();
-        console.log("DEBUG: Payments data received:", data);
-        setAdminPayments(data);
+        fetchPendingPayments();
+        alert("Cobro anulado correctamente.");
       }
-    } catch (e) { console.error("DEBUG: Error fetching admin payments", e); }
+    } catch (e) { console.error("Error canceling payment", e); }
   };
 
   const fetchCoaches = async () => {
@@ -345,8 +431,22 @@ const AdminDashboard = () => {
         flexDirection: 'column',
         padding: '20px 0'
       }}>
-        <div style={{ padding: '0 20px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <p style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 10px 0' }}>Módulos de Gestión</p>
+        <div style={{ 
+            padding: '30px 20px', 
+            background: '#f8fafc', 
+            textAlign: 'center', 
+            borderBottom: '1px solid #f1f5f9' 
+        }}>
+            <AvatarUpload 
+                currentAvatar={user?.profile_picture_url} 
+                onUploadSuccess={(url) => console.log("New avatar:", url)} 
+            />
+            <h3 style={{ margin: '15px 0 0 0', fontSize: '16px', fontWeight: 900, color: '#2d4739' }}>
+                {user?.name}
+            </h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+                ADMINISTRADOR
+            </p>
         </div>
 
         <div style={{ flex: 1, padding: '10px 15px' }}>
@@ -354,7 +454,8 @@ const AdminDashboard = () => {
             { id: 'users', label: 'ADMINISTRAR USUARIOS', icon: <Users size={20} /> },
             { id: 'create', label: 'CREAR RUTINA', icon: <PlusCircle size={20} /> },
             { id: 'coaches', label: 'GESTIÓN DE COACHES', icon: <Shield size={20} /> },
-            { id: 'payments', label: 'CONTROL DE PAGOS', icon: <DollarSign size={20} /> },
+            { id: 'pending_payments', label: 'COBROS PENDIENTES', icon: <DollarSign size={20} /> },
+            { id: 'payment_history', label: 'HISTORIAL DE PAGOS', icon: <FileText size={20} /> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -383,16 +484,8 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px' }}>
-            <div style={{ width: 35, height: 35, borderRadius: '50%', background: '#a2d149', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2d4739', fontWeight: 900, fontSize: 14 }}>
-              {user?.name?.[0].toUpperCase()}
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#1e293b' }}>{user?.name}</p>
-              <p style={{ margin: 0, fontSize: 10, color: '#64748b' }}>Administrador</p>
-            </div>
-          </div>
+        <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'center', background: '#f8fafc' }}>
+            <p style={{ margin: 0, fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{user?.email}</p>
         </div>
       </div>
 
@@ -909,44 +1002,133 @@ const AdminDashboard = () => {
           )}
 
 
-          {/* TAB 4: CONTROL DE PAGOS */}
-          {activeTab === 'payments' && (
-            <div style={{ background: '#fff', borderRadius: 20, padding: 30, boxShadow: '0 15px 40px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', margin: '0 20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 }}>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px' }}>CONTROL DE PAGOS DE COACHES</h2>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase' }}>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>FECHA</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>COACH</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>ATLETAS</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>MONTO TOTAL</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>ACCIONES</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {adminPayments.map((batch: any, i: number) => (
-                      <tr key={batch.batch_id || i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '16px 20px', fontSize: 13, fontWeight: 600 }}>{batch.date}</td>
-                        <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 800, color: '#2d4739' }}>{batch.coach_name}</td>
-                        <td style={{ padding: '16px 20px', fontSize: 13 }}>{batch.clients_count} atletas</td>
-                        <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 900, color: '#10b981' }}>${batch.total_amount.toLocaleString()}</td>
-                        <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                          <button 
-                            onClick={() => setSelectedBatch(batch)}
-                            style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <FileText size={14} /> VER FACTURA COMPLETA
-                          </button>
-                        </td>
-                      </tr>
+          {/* TAB 4: COBROS PENDIENTES */}
+          {activeTab === 'pending_payments' && (
+            <div style={{ padding: 40 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25, flexWrap: 'wrap', gap: 20 }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px' }}>COBROS PENDIENTES DE CONCILIACIÓN</h2>
+                  <p style={{ margin: '5px 0 0 0', fontSize: 12, color: '#64748b', fontWeight: 600 }}>{pendingPayments.length} COBROS POR LIQUIDAR</p>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Buscador */}
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', width: 220 }}>
+                    <Search size={14} color="#64748b" style={{ marginRight: 6 }} />
+                    <input
+                      type="text"
+                      placeholder="Buscar atleta..."
+                      value={pendingSearchQuery}
+                      onChange={(e) => setPendingSearchQuery(e.target.value)}
+                      style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '12px' }}
+                    />
+                  </div>
+
+                  {/* Filtro por Coach */}
+                  <select 
+                    value={pendingCoachFilter}
+                    onChange={(e) => setPendingCoachFilter(e.target.value)}
+                    style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontSize: '12px', fontWeight: 700, color: '#475569', outline: 'none' }}
+                  >
+                    <option value="all">TODOS LOS COACHES</option>
+                    {coaches.map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
-                    {adminPayments.length === 0 && (
-                      <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No hay registros de pagos.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>FECHA</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>ATLETA</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>COACH</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>PLAN</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>MONTO</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>ACCIONES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingPayments.filter(p => {
+                        const matchesSearch = p.client_name.toLowerCase().includes(pendingSearchQuery.toLowerCase());
+                        const matchesCoach = pendingCoachFilter === 'all' || p.coach_name === pendingCoachFilter;
+                        return matchesSearch && matchesCoach;
+                      }).map((p: any) => (
+                        <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '16px 20px', fontSize: 12, color: '#64748b' }}>{new Date(p.created_at).toLocaleDateString()}</td>
+                          <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{p.client_name}</td>
+                          <td style={{ padding: '16px 20px', fontSize: 13, fontWeight: 700, color: '#2d4739' }}>{p.coach_name || 'Sin asignar'}</td>
+                          <td style={{ padding: '16px 20px' }}>
+                            <span style={{ background: '#f0f9ff', color: '#0369a1', padding: '4px 10px', borderRadius: 20, fontSize: '10px', fontWeight: 800 }}>{p.plan_type}</span>
+                          </td>
+                          <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 900, color: '#b91c1c' }}>${p.amount.toLocaleString()}</td>
+                          <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                            <button 
+                              onClick={() => handleCancelPayment(p.id)}
+                              style={{ background: '#fff', color: '#ef4444', border: '1px solid #fecaca', padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s' }}
+                              onMouseOver={e => e.currentTarget.style.background = '#fee2e2'}
+                              onMouseOut={e => e.currentTarget.style.background = '#fff'}
+                            >
+                              ANULAR COBRO
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {pendingPayments.length === 0 && (
+                        <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>No hay cobros pendientes registrados.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: HISTORIAL DE PAGOS */}
+          {activeTab === 'payment_history' && (
+            <div style={{ padding: 40 }}>
+              <div style={{ marginBottom: 25 }}>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px' }}>HISTORIAL DE LIQUIDACIONES</h2>
+                <p style={{ margin: '5px 0 0 0', fontSize: 12, color: '#64748b', fontWeight: 600 }}>Registro de lotes pagados a coaches</p>
+              </div>
+
+              <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>FECHA</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>COACH</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>ATLETAS</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800 }}>MONTO TOTAL</th>
+                        <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>ACCIONES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminPayments.map((batch: any, i: number) => (
+                        <tr key={batch.batch_id || i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '16px 20px', fontSize: 13, fontWeight: 600 }}>{batch.date}</td>
+                          <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 800, color: '#2d4739' }}>{batch.coach_name}</td>
+                          <td style={{ padding: '16px 20px', fontSize: 13 }}>{batch.clients_count} atletas</td>
+                          <td style={{ padding: '16px 20px', fontSize: 14, fontWeight: 900, color: '#10b981' }}>${batch.total_amount.toLocaleString()}</td>
+                          <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                            <button 
+                              onClick={() => setSelectedBatch(batch)}
+                              style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '10px 16px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <FileText size={14} /> VER FACTURA
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {adminPayments.length === 0 && (
+                        <tr><td colSpan={5} style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>No hay liquidaciones registradas.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1039,8 +1221,9 @@ const AdminDashboard = () => {
             <div style={{ overflowY: 'auto', flex: 1 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '10px', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '12px 15px' }}>Atleta</th>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '9px', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '12px 15px' }}>Atleta / Correo</th>
+                    <th style={{ padding: '12px 15px' }}>Trámite</th>
                     <th style={{ padding: '12px 15px' }}>Plan</th>
                     <th style={{ padding: '12px 15px' }}>Periodo</th>
                     <th style={{ padding: '12px 15px', textAlign: 'right' }}>Monto</th>
@@ -1049,7 +1232,15 @@ const AdminDashboard = () => {
                 <tbody>
                   {selectedBatch.clients.map((c: any, i: number) => (
                     <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 15px', fontSize: 13, fontWeight: 700 }}>{c.name}</td>
+                      <td style={{ padding: '12px 15px' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{c.name}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{c.email}</div>
+                      </td>
+                      <td style={{ padding: '12px 15px' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: c.tramite === 'Nuevo' ? '#0891b2' : '#9333ea', background: c.tramite === 'Nuevo' ? '#ecfeff' : '#faf5ff', padding: '2px 8px', borderRadius: 12 }}>
+                          {c.tramite || 'Nuevo'}
+                        </span>
+                      </td>
                       <td style={{ padding: '12px 15px', fontSize: 12 }}>{c.plan_type}</td>
                       <td style={{ padding: '12px 15px', fontSize: 11, color: '#64748b' }}>{c.start_date} al {c.end_date}</td>
                       <td style={{ padding: '12px 15px', fontSize: 13, fontWeight: 800, textAlign: 'right', color: '#10b981' }}>${c.amount.toLocaleString()}</td>
@@ -1060,8 +1251,15 @@ const AdminDashboard = () => {
             </div>
             
             <div style={{ marginTop: 20, paddingTop: 15, borderTop: '2px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>TOTAL PAGADO</span>
-              <span style={{ fontSize: 20, fontWeight: 900, color: '#2d4739' }}>${selectedBatch.total_amount.toLocaleString()}</span>
+              <button 
+                onClick={() => downloadInvoice(selectedBatch)}
+                style={{ background: '#2d4739', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                <Download size={18} /> DESCARGAR PDF
+              </button>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#475569', display: 'block' }}>TOTAL PAGADO</span>
+                <span style={{ fontSize: 24, fontWeight: 900, color: '#2d4739' }}>${selectedBatch.total_amount.toLocaleString()}</span>
+              </div>
             </div>
           </div>
         </div>

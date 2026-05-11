@@ -51,7 +51,8 @@ const Login = () => {
         name: data.name,
         email: data.email,
         role: data.role,
-        isActive: data.is_active
+        isActive: data.is_active,
+        profile_picture_url: data.profile_picture_url
       });
 
       if (data.role === 'Admin') {
@@ -82,14 +83,14 @@ const Login = () => {
       {/* Coach Contact Card */}
       <div style={{
         background: '#ffffff',
-        padding: '20px 32px',
+        padding: '12px 20px',
         borderRadius: 16,
         textAlign: 'center',
         border: '1px solid #a2d149',
-        marginBottom: 20,
+        marginBottom: 12,
         width: '100%',
-        maxWidth: 380,
-        boxShadow: '0 4px 24px rgba(162, 209, 73, 0.08)'
+        maxWidth: 280,
+        boxShadow: '0 4px 20px rgba(162, 209, 73, 0.06)'
       }}>
         <p style={{ fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', color: '#a2d149', fontWeight: 800, margin: '0 0 10px 0' }}>
           Comunícate con nosotros
@@ -114,7 +115,7 @@ const Login = () => {
               <circle cx="12" cy="12" r="4" stroke="#a2d149" strokeWidth="2" />
               <circle cx="17.5" cy="6.5" r="1.2" fill="#a2d149" />
             </svg>
-            @jefeandrea
+            @bodylogicapp
           </a>
           {/* Phone */}
           <a
@@ -136,8 +137,8 @@ const Login = () => {
         </div>
       </div>
 
-      <div style={{ background: '#fff', padding: 40, borderRadius: 20, textAlign: 'center', border: '1px solid #e0e7e1', width: '100%', maxWidth: 380, boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-        <h3 style={{ marginBottom: 30, color: '#2d4739' }}>Iniciar Sesión / Acceder a tu Plan</h3>
+      <div style={{ background: '#fff', padding: '20px 20px', borderRadius: 20, textAlign: 'center', border: '1px solid #e0e7e1', width: '100%', maxWidth: 280, boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+        <h3 style={{ marginBottom: 15, color: '#2d4739', fontSize: '1rem' }}>Acceder a tu Plan</h3>
 
         <GoogleLogin
           onSuccess={handleSuccess}
