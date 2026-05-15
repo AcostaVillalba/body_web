@@ -59,6 +59,14 @@ class CoachCreate(BaseModel):
     phone: Optional[str] = None
     instagram: Optional[str] = None
 
+class CoachProfileUpdate(BaseModel):
+    email: str
+    phone: Optional[str] = None
+    instagram: Optional[str] = None
+    presentation: Optional[str] = None
+    mission: Optional[str] = None
+    vision: Optional[str] = None
+
 class RoutineReq(BaseModel):
     client_email: str
     routine_data: str
@@ -270,7 +278,11 @@ def get_my_routine(current_user=Depends(auth.get_current_user)):
             coach_info = {
                 "name": str(coach.get('name', '—')) if coach.get('name') else '—',
                 "phone": str(coach.get('phone', '')) if coach.get('phone') else '',
-                "instagram": str(coach.get('instagram', '')) if coach.get('instagram') else ''
+                "instagram": str(coach.get('instagram', '')) if coach.get('instagram') else '',
+                "presentation": coach.get('presentation', ''),
+                "mission": coach.get('mission', ''),
+                "vision": coach.get('vision', ''),
+                "profile_picture_url": coach.get('profile_picture_url', '')
             }
 
     return {
@@ -373,6 +385,54 @@ def cancel_payment(payment_id: int, current_user=Depends(auth.get_current_active
     db = get_bq_db()
     db.cancel_payment(payment_id)
     return {"status": "success", "message": "Cobro anulado"}
+
+# ====================
+# Coach Profile Endpoints
+# ====================
+@app.get("/api/coach/profile")
+def get_coach_profile(current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    coach = db.get_user_by_id(current_user.id)
+    if not coach:
+        raise HTTPException(status_code=404, detail="Coach no encontrado")
+    
+    return {
+        "email": coach.get('email', ''),
+        "phone": str(coach.get('phone', '')) if coach.get('phone') is not None else '',
+        "instagram": coach.get('instagram', ''),
+        "presentation": coach.get('presentation', ''),
+        "mission": coach.get('mission', ''),
+        "vision": coach.get('vision', '')
+    }
+
+@app.post("/api/coach/profile")
+def update_coach_profile(req: CoachProfileUpdate, current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    
+    from database_bq import PROJECT_ID, DATASET_ID
+    sql = f"""
+        UPDATE `{PROJECT_ID}.{DATASET_ID}.users` 
+        SET email=@email, phone=@phone, instagram=@instagram, 
+            presentation=@presentation, mission=@mission, vision=@vision 
+        WHERE id=@id
+    """
+    
+    bq_params = [
+        bigquery.ScalarQueryParameter("email", "STRING", req.email),
+        bigquery.ScalarQueryParameter("phone", "STRING", req.phone),
+        bigquery.ScalarQueryParameter("instagram", "STRING", req.instagram),
+        bigquery.ScalarQueryParameter("presentation", "STRING", req.presentation),
+        bigquery.ScalarQueryParameter("mission", "STRING", req.mission),
+        bigquery.ScalarQueryParameter("vision", "STRING", req.vision),
+        bigquery.ScalarQueryParameter("id", "INTEGER", current_user.id)
+    ]
+    
+    try:
+        db.query(sql, bq_params)
+        return {"status": "success", "message": "Perfil actualizado correctamente"}
+    except Exception as e:
+        print(f"Error updating coach profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar perfil: {str(e)}")
 
 # ====================
 # Profile Picture Endpoints

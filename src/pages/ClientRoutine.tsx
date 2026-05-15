@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, ChevronDown, ChevronUp, History, X, Bell, Menu, User, Award, Info, BookOpen } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronUp, History, X, Bell, Menu, User, Award, Info, BookOpen, ArrowLeft } from 'lucide-react';
 import logoBody2 from '../assets/logobody2.png';
 import { EXERCISES_DB, getImageUrl } from '../data';
 import ExerciseImage from '../components/ExerciseImage';
 import AvatarUpload from '../components/AvatarUpload';
+import InfoModal from '../components/InfoModal';
 import API_URL from '../api';
 
 const ClientRoutine = () => {
-    const { user, token, logout } = useAuth();
+    const { user, token, logout, setIsLoading } = useAuth();
     const [routineDays, setRoutineDays] = useState<any[]>([]);
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -19,6 +20,7 @@ const ClientRoutine = () => {
     const [coach, setCoach] = useState<any>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'routine' | 'profile' | 'coach' | 'rules'>('routine');
     const [isNotifOpen, setIsNotifOpen] = useState(false);
 
@@ -54,11 +56,12 @@ const ClientRoutine = () => {
                 console.error("Failed to load routine");
             } finally {
                 setLoading(false);
+                setIsLoading(false); // Disable global loading screen
             }
         };
 
         fetchRoutine();
-    }, [token]);
+    }, [token, setIsLoading]);
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -153,7 +156,7 @@ const ClientRoutine = () => {
 
     return (
         <div style={{ fontFamily: "'Montserrat', sans-serif", background: '#f4f7f5', color: '#111', minHeight: '100vh', padding: '0', position: 'relative' }}>
-            
+
             {/* Background Watermark */}
             <div style={{
                 position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -162,14 +165,14 @@ const ClientRoutine = () => {
             }} />
 
             {/* NEW SLIM HEADER */}
-            <div style={{ 
-                position: 'fixed', top: 0, left: 0, right: 0, height: '70px', 
-                background: '#2d4739', display: 'flex', alignItems: 'center', 
-                justifyContent: 'space-between', padding: '0 20px', color: '#fff', 
-                zIndex: 1000, boxShadow: '0 2px 10px rgba(0,0,0,0.2)' 
+            <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, height: '70px',
+                background: '#2d4739', display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between', padding: '0 20px', color: '#fff',
+                zIndex: 1000, boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-                    <button 
+                    <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '8px' }}>
                         {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -181,7 +184,7 @@ const ClientRoutine = () => {
                         </h1>
                     </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
                     <div className="notif-trigger" style={{ position: 'relative' }}>
                         <button
@@ -197,48 +200,49 @@ const ClientRoutine = () => {
                                 const diffDaysControl = Math.ceil((control.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                                 return (diffDaysEnd >= 0 && diffDaysEnd <= 3) || (diffDaysControl === 1);
                             })()) && (
-                                <span style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, border: '2px solid #2d4739' }}>
-                                    {notifications.length + (profile ? 1 : 0)}
-                                </span>
-                            )}
+                                    <span style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, border: '2px solid #2d4739' }}>
+                                        {notifications.length + (profile ? 1 : 0)}
+                                    </span>
+                                )}
                         </button>
 
                         {isNotifOpen && (
                             <>
-                                <div 
+                                <div
                                     className="notif-overlay"
                                     onClick={() => setIsNotifOpen(false)}
-                                    style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1099, backdropFilter: 'blur(2px)' }} 
+                                    style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1099, backdropFilter: 'blur(2px)' }}
                                 />
                                 <div className="notif-container" style={{ position: 'absolute', top: 45, right: 0, width: 300, background: '#fff', borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 1100, border: '1px solid #e2e8f0', overflow: 'hidden', animation: 'fadeIn 0.2s ease-out' }}>
-                                <div style={{ padding: '15px 20px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h4 style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#1e293b' }}>NOTIFICACIONES</h4>
+                                    <div style={{ padding: '15px 20px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <h4 style={{ margin: 0, fontSize: 12, fontWeight: 800, color: '#1e293b' }}>NOTIFICACIONES</h4>
+                                    </div>
+                                    <div style={{ maxHeight: 350, overflowY: 'auto' }}>
+                                        {notifications.map(n => (
+                                            <div key={n.id} onClick={() => deleteNotif(n.id)} style={{ padding: 15, borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }}>
+                                                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#1e293b' }}>Rutina Actualizada</p>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: 11, color: '#64748b' }}>{n.message}</p>
+                                            </div>
+                                        ))}
+                                        {notifications.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>No hay notificaciones nuevas</div>}
+                                    </div>
                                 </div>
-                                <div style={{ maxHeight: 350, overflowY: 'auto' }}>
-                                    {notifications.map(n => (
-                                        <div key={n.id} onClick={() => deleteNotif(n.id)} style={{ padding: 15, borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }}>
-                                            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#1e293b' }}>Rutina Actualizada</p>
-                                            <p style={{ margin: '4px 0 0 0', fontSize: 11, color: '#64748b' }}>{n.message}</p>
-                                        </div>
-                                    ))}
-                                    {notifications.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>No hay notificaciones nuevas</div>}
-                                </div>
-                            </div>
                             </>
                         )}
                     </div>
-                    <button 
-                        onClick={logout} 
-                        style={{ 
-                            background: '#333', color: '#f87171', border: 'none', 
-                            padding: '8px 16px', borderRadius: 10, fontSize: '11px', 
-                            fontWeight: 800, cursor: 'pointer', display: 'flex', 
+                    <button
+                        onClick={logout}
+                        className="compact-mobile"
+                        style={{
+                            background: '#333', color: '#f87171', border: 'none',
+                            padding: '8px 16px', borderRadius: 10, fontSize: '11px',
+                            fontWeight: 800, cursor: 'pointer', display: 'flex',
                             alignItems: 'center', gap: 8, transition: 'all 0.2s'
                         }}
                         onMouseOver={e => e.currentTarget.style.background = '#444'}
                         onMouseOut={e => e.currentTarget.style.background = '#333'}
                     >
-                        <LogOut size={14} /> SALIR
+                        <LogOut size={14} /> <span className="hide-mobile">SALIR</span>
                     </button>
                 </div>
             </div>
@@ -247,20 +251,34 @@ const ClientRoutine = () => {
             {isMenuOpen && (
                 <div onClick={() => setIsMenuOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, backdropFilter: 'blur(4px)' }} />
             )}
-            <div style={{ 
-                position: 'fixed', top: '70px', left: isMenuOpen ? 0 : '-300px', width: '280px', height: 'calc(100vh - 70px)', 
-                background: '#fff', zIndex: 1200, transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-                boxShadow: '4px 0 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', padding: '0' 
+            <div style={{
+                position: 'fixed', top: '70px', left: isMenuOpen ? 0 : '-320px', width: '280px', maxWidth: '85vw', height: 'calc(100vh - 70px)',
+                background: '#fff', zIndex: 1200, transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '4px 0 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', padding: '20px 0', overflowY: 'auto'
             }}>
-                <div style={{ 
-                    padding: '30px 20px', 
-                    background: '#f8fafc', 
-                    textAlign: 'center', 
-                    borderBottom: '1px solid #f1f5f9' 
+                <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '0 20px' }}>
+                    <button
+                        onClick={() => setIsMenuOpen(false)}
+                        style={{
+                            background: '#f1f5f9', border: 'none', width: 40, height: 40, borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                            color: '#2d4739', transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                        onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+                    >
+                        <ArrowLeft size={20} />
+                    </button>
+                </div>
+                <div style={{
+                    padding: '15px 20px',
+                    background: '#f8fafc',
+                    textAlign: 'center',
+                    borderBottom: '1px solid #f1f5f9'
                 }}>
-                    <AvatarUpload 
-                        currentAvatar={user?.profile_picture_url} 
-                        onUploadSuccess={(url) => console.log("New avatar:", url)} 
+                    <AvatarUpload
+                        currentAvatar={user?.profile_picture_url}
+                        onUploadSuccess={(url) => console.log("New avatar:", url)}
                     />
                     <h3 style={{ margin: '15px 0 0 0', fontSize: '16px', fontWeight: 900, color: '#2d4739' }}>
                         {user?.name}
@@ -270,7 +288,7 @@ const ClientRoutine = () => {
                     </p>
                 </div>
 
-                <div style={{ flex: 1, padding: '20px 15px' }}>
+                <div style={{ flex: 1, padding: '20px 15px', overflowY: 'auto' }}>
                     {[
                         { id: 'routine', label: 'MI RUTINA', icon: <BookOpen size={20} /> },
                         { id: 'profile', label: 'MI PERFIL', icon: <User size={20} /> },
@@ -281,9 +299,9 @@ const ClientRoutine = () => {
                             key={tab.id}
                             onClick={() => { setActiveTab(tab.id as any); setIsMenuOpen(false); }}
                             style={{
-                                width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', 
-                                marginBottom: '8px', borderRadius: '12px', border: 'none', cursor: 'pointer', 
-                                fontWeight: 800, fontSize: '13px', transition: 'all 0.2s', textAlign: 'left',
+                                width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px',
+                                marginBottom: '4px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                                fontWeight: 700, fontSize: '11px', transition: 'all 0.2s', textAlign: 'left',
                                 background: activeTab === tab.id ? '#f0fdf4' : 'transparent',
                                 color: activeTab === tab.id ? '#2d4739' : '#64748b',
                                 borderLeft: activeTab === tab.id ? '4px solid #a2d149' : '4px solid transparent'
@@ -292,6 +310,30 @@ const ClientRoutine = () => {
                             {tab.label}
                         </button>
                     ))}
+
+                    {/* New INFO Item */}
+                    <button
+                        onClick={() => { setIsInfoModalOpen(true); setIsMenuOpen(false); }}
+                        style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: '8px 16px',
+                            marginTop: '12px',
+                            borderRadius: '12px',
+                            border: '2px solid rgba(162, 209, 73, 0.2)',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            fontSize: '11px',
+                            transition: 'all 0.2s',
+                            textAlign: 'left',
+                            background: 'rgba(162, 209, 73, 0.05)',
+                            color: '#a2d149'
+                        }}>
+                        <Info size={20} />
+                        INFORMACIÓN
+                    </button>
                 </div>
                 <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'center', background: '#f8fafc' }}>
                     <p style={{ margin: 0, fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{user?.email}</p>
@@ -308,197 +350,197 @@ const ClientRoutine = () => {
 
                 {activeTab === 'routine' && (
                     <>
-                    {routineDays.length === 0 ? (
-                        <div style={{ background: '#fff', padding: 40, borderRadius: 16, textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1, marginTop: 40 }}>
-                            <h3 style={{ color: '#a2d149' }}>Aún no tienes rutinas asignadas</h3>
-                            <p style={{ color: '#666' }}>Tu coach publicará tu plan aquí pronto.</p>
-                        </div>
-                    ) : (
-                        <div style={{ position: 'relative', zIndex: 1, marginTop: 10 }}>
-                            <h2 style={{ fontSize: '1.2rem', fontWeight: 900, textTransform: 'uppercase', margin: '0 0 20px 0', color: '#111', textAlign: 'center' }}>Tu Semana de Entrenamiento</h2>
-
-                            {routineDays.map((day) => (
-                                <div key={day.name} style={{ marginBottom: 15 }}>
-                                    {/* Accordion Header */}
-                                    <button
-                                        onClick={() => setOpenDay(openDay === day.name ? null : day.name)}
-                                        style={{
-                                            width: '100%', background: openDay === day.name ? '#a2d149' : '#fff', color: openDay === day.name ? '#fff' : '#111',
-                                            padding: '18px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                            border: openDay === day.name ? 'none' : '2px solid #e5e7eb', borderRadius: 12, fontWeight: 900, fontSize: '18px',
-                                            textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s',
-                                            boxShadow: openDay === day.name ? '0 8px 20px rgba(162, 209, 73, 0.3)' : 'none'
-                                        }}
-                                    >
-                                        {day.name}
-                                        {openDay === day.name ? <ChevronUp /> : <ChevronDown />}
-                                    </button>
-
-                                {/* Accordion Body - Single Visualizer Mode */}
-                                {openDay === day.name && (
-                                    <div style={{ padding: '20px 0', animation: 'fadeIn 0.3s ease-out' }}>
-                                        {(() => {
-                                            const totalGroups = day.groups.length;
-                                            const currentGroup = day.groups[currentStep];
-
-                                            if (!currentGroup) return <p style={{ textAlign: 'center', color: '#666' }}>No hay ejercicios en este día.</p>;
-
-                                            const isBiserie = currentGroup.exercises.length > 1;
-
-                                            return (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                                    {/* Card Container */}
-                                                    <div style={{
-                                                        background: '#fff',
-                                                        border: '2px solid #a2d149',
-                                                        borderRadius: 24,
-                                                        overflow: 'hidden',
-                                                        boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-                                                        minHeight: '400px',
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        position: 'relative',
-                                                        transition: 'all 0.3s ease'
-                                                    }}>
-                                                        {/* Step Header */}
-                                                        <div style={{ display: 'flex', height: 45, alignItems: 'stretch' }}>
-                                                            <div style={{ background: '#ef4444', color: '#fff', padding: '0 20px', fontWeight: 900, fontSize: '13px', display: 'flex', alignItems: 'center', borderRadius: '0 0 20px 0', letterSpacing: '1.5px' }}>
-                                                                BLOQUE {currentStep + 1} DE {totalGroups}
-                                                            </div>
-                                                            {isBiserie && (
-                                                                <div style={{ background: '#a2d149', color: '#fff', flex: 1, padding: 10, fontWeight: 900, fontSize: '12px', letterSpacing: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', textTransform: 'uppercase' }}>
-                                                                    🔥 BISERIE / SUPER SERIE
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Exercises Scroll Area */}
-                                                        <div style={{
-                                                            padding: '25px',
-                                                            flex: 1,
-                                                            overflowY: 'auto',
-                                                            display: 'flex',
-                                                            flexDirection: isBiserie ? 'column' : 'row',
-                                                            gap: '30px',
-                                                            alignItems: 'center',
-                                                            justifyContent: isBiserie ? 'flex-start' : 'center'
-                                                        }}>
-                                                            {currentGroup.exercises.map((ex: any, idx: number) => {
-                                                                const currentImgUrl = getImageUrl(ex.name) || '';
-                                                                return (
-                                                                    <div key={ex.id} style={{
-                                                                        width: '100%',
-                                                                        animation: 'slideIn 0.4s ease-out',
-                                                                        borderBottom: (isBiserie && idx === 0) ? '2px dashed #e5e7eb' : 'none',
-                                                                        paddingBottom: (isBiserie && idx === 0) ? '25px' : '0'
-                                                                    }}>
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                                                                            <div>
-                                                                                {getMuscleGroup(ex.name) && (
-                                                                                    <span style={{
-                                                                                        fontSize: '11px', fontWeight: 800,
-                                                                                        letterSpacing: '1px', textTransform: 'uppercase',
-                                                                                        color: '#3394d4', background: '#e0f3f5',
-                                                                                        padding: '3px 10px', borderRadius: 20,
-                                                                                        marginBottom: 8, display: 'inline-block'
-                                                                                    }}>
-                                                                                        {getMuscleGroup(ex.name)}
-                                                                                    </span>
-                                                                                )}
-                                                                                <div style={{ fontWeight: 900, fontSize: '22px', color: '#111', marginBottom: 10, textTransform: 'uppercase', lineHeight: 1.1 }}>
-                                                                                    {isBiserie ? (idx === 0 ? 'A. ' : 'B. ') : ''}{ex.name}
-                                                                                </div>
-                                                                                <div style={{ display: 'inline-block', background: '#fdfaf0', border: '1px solid #f2e3b3', color: '#a38210', padding: '6px 16px', borderRadius: 30, fontWeight: 800, fontSize: '13px', marginBottom: 12 }}>
-                                                                                    {ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series} Series x ${ex.reps} Reps`}
-                                                                                </div>
-                                                                                {ex.note && (
-                                                                                    <div style={{ fontSize: '13px', color: '#444', background: '#f8f9fa', padding: 12, borderRadius: 10, borderLeft: '4px solid #a2d149', fontWeight: 500 }}>
-                                                                                        {ex.note}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                            {currentImgUrl && (
-                                                                                <div style={{ width: '100%', borderRadius: 16, overflow: 'hidden', background: '#fafafa', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                                                                                    <ExerciseImage src={currentImgUrl} alt={ex.name} />
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                )
-                                                            })}
-                                                        </div>
-
-                                                        {/* Rest Info */}
-                                                        <div style={{ background: '#f1f5f9', color: '#64748b', textAlign: 'center', padding: '10px', fontWeight: 800, fontSize: '11px', letterSpacing: '1px', borderTop: '1px solid #e5e7eb' }}>
-                                                            ⌛ 3 MINUTOS DE DESCANSO DESPUÉS DE ESTE BLOQUE
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Navigation Controls */}
-                                                    <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
-                                                        <button
-                                                            disabled={currentStep === 0}
-                                                            onClick={() => setCurrentStep(prev => prev - 1)}
-                                                            style={{
-                                                                flex: 1, padding: '18px', background: currentStep === 0 ? '#e5e7eb' : '#fff',
-                                                                color: currentStep === 0 ? '#94a3b8' : '#2d4739', border: '2px solid',
-                                                                borderColor: currentStep === 0 ? '#e5e7eb' : '#2d4739',
-                                                                borderRadius: 16, fontWeight: 900, fontSize: '14px',
-                                                                cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
-                                                                transition: 'all 0.2s', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'
-                                                            }}
-                                                        >
-                                                            ANTERIOR
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                if (currentStep === totalGroups - 1) {
-                                                                    setOpenDay(null);
-                                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                                } else {
-                                                                    setCurrentStep(prev => prev + 1);
-                                                                }
-                                                            }}
-                                                            style={{
-                                                                flex: 2, padding: '18px',
-                                                                background: currentStep === totalGroups - 1 ? '#a2d149' : '#2d4739',
-                                                                color: '#fff', border: 'none',
-                                                                borderRadius: 16, fontWeight: 900, fontSize: '14px',
-                                                                cursor: 'pointer',
-                                                                transition: 'all 0.2s', boxShadow: '0 10px 20px rgba(45, 71, 57, 0.2)'
-                                                            }}
-                                                        >
-                                                            {currentStep === totalGroups - 1 ? 'FINALIZAR ENTRENAMIENTO' : 'SIGUIENTE EJERCICIO'}
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Progress Dots */}
-                                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
-                                                        {day.groups.map((_: any, idx: number) => (
-                                                            <div key={idx} style={{
-                                                                width: idx === currentStep ? '24px' : '8px',
-                                                                height: '8px',
-                                                                borderRadius: '4px',
-                                                                background: idx === currentStep ? '#a2d149' : '#cbd5e1',
-                                                                transition: 'all 0.3s'
-                                                            }} />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                )}
+                        {routineDays.length === 0 ? (
+                            <div style={{ background: '#fff', padding: 40, borderRadius: 16, textAlign: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1, marginTop: 40 }}>
+                                <h3 style={{ color: '#a2d149' }}>Aún no tienes rutinas asignadas</h3>
+                                <p style={{ color: '#666' }}>Tu coach publicará tu plan aquí pronto.</p>
                             </div>
-                        ))}
-                    </div>
+                        ) : (
+                            <div style={{ position: 'relative', zIndex: 1, marginTop: 10 }}>
+                                <h2 style={{ fontSize: '1.2rem', fontWeight: 900, textTransform: 'uppercase', margin: '0 0 20px 0', color: '#111', textAlign: 'center' }}>Tu Semana de Entrenamiento</h2>
+
+                                {routineDays.map((day) => (
+                                    <div key={day.name} style={{ marginBottom: 10 }}>
+                                        {/* Accordion Header */}
+                                        <button
+                                            onClick={() => setOpenDay(openDay === day.name ? null : day.name)}
+                                            style={{
+                                                width: '100%', background: openDay === day.name ? '#a2d149' : '#fff', color: openDay === day.name ? '#fff' : '#111',
+                                                padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                border: openDay === day.name ? 'none' : '2px solid #e5e7eb', borderRadius: 10, fontWeight: 900, fontSize: '15px',
+                                                textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.3s',
+                                                boxShadow: openDay === day.name ? '0 6px 15px rgba(162, 209, 73, 0.2)' : 'none'
+                                            }}
+                                        >
+                                            {day.name}
+                                            {openDay === day.name ? <ChevronUp /> : <ChevronDown />}
+                                        </button>
+
+                                        {/* Accordion Body - Single Visualizer Mode */}
+                                        {openDay === day.name && (
+                                            <div style={{ padding: '20px 0', animation: 'fadeIn 0.3s ease-out' }}>
+                                                {(() => {
+                                                    const totalGroups = day.groups.length;
+                                                    const currentGroup = day.groups[currentStep];
+
+                                                    if (!currentGroup) return <p style={{ textAlign: 'center', color: '#666' }}>No hay ejercicios en este día.</p>;
+
+                                                    const isBiserie = currentGroup.exercises.length > 1;
+
+                                                    return (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                                            {/* Card Container */}
+                                                            <div style={{
+                                                                background: '#fff',
+                                                                border: '2px solid #a2d149',
+                                                                borderRadius: 24,
+                                                                overflow: 'hidden',
+                                                                boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+                                                                minHeight: '400px',
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                position: 'relative',
+                                                                transition: 'all 0.3s ease'
+                                                            }}>
+                                                                {/* Step Header */}
+                                                                <div style={{ display: 'flex', height: 45, alignItems: 'stretch' }}>
+                                                                    <div style={{ background: '#ef4444', color: '#fff', padding: '0 15px', fontWeight: 900, fontSize: '11px', display: 'flex', alignItems: 'center', borderRadius: '0 0 15px 0', letterSpacing: '1px' }}>
+                                                                        BLOQUE {currentStep + 1} DE {totalGroups}
+                                                                    </div>
+                                                                    {isBiserie && (
+                                                                        <div style={{ background: '#a2d149', color: '#fff', flex: 1, padding: 8, fontWeight: 900, fontSize: '10px', letterSpacing: '1.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', textTransform: 'uppercase' }}>
+                                                                            🔥 BISERIE / SUPER SERIE
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Exercises Scroll Area */}
+                                                                <div style={{
+                                                                    padding: '25px',
+                                                                    flex: 1,
+                                                                    overflowY: 'auto',
+                                                                    display: 'flex',
+                                                                    flexDirection: isBiserie ? 'column' : 'row',
+                                                                    gap: '30px',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: isBiserie ? 'flex-start' : 'center'
+                                                                }}>
+                                                                    {currentGroup.exercises.map((ex: any, idx: number) => {
+                                                                        const currentImgUrl = getImageUrl(ex.name) || '';
+                                                                        return (
+                                                                            <div key={ex.id} style={{
+                                                                                width: '100%',
+                                                                                animation: 'slideIn 0.4s ease-out',
+                                                                                borderBottom: (isBiserie && idx === 0) ? '2px dashed #e5e7eb' : 'none',
+                                                                                paddingBottom: (isBiserie && idx === 0) ? '25px' : '0'
+                                                                            }}>
+                                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                                                                                    <div>
+                                                                                        {getMuscleGroup(ex.name) && (
+                                                                                            <span style={{
+                                                                                                fontSize: '10px', fontWeight: 800,
+                                                                                                letterSpacing: '1px', textTransform: 'uppercase',
+                                                                                                color: '#3394d4', background: '#e0f3f5',
+                                                                                                padding: '2px 8px', borderRadius: 20,
+                                                                                                marginBottom: 6, display: 'inline-block'
+                                                                                            }}>
+                                                                                                {getMuscleGroup(ex.name)}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        <div style={{ fontWeight: 900, fontSize: '15px', color: '#111', marginBottom: 8, textTransform: 'uppercase', lineHeight: 1.1 }}>
+                                                                                            {isBiserie ? (idx === 0 ? 'A. ' : 'B. ') : ''}{ex.name}
+                                                                                        </div>
+                                                                                        <div style={{ display: 'inline-block', background: '#fdfaf0', border: '1px solid #f2e3b3', color: '#a38210', padding: '4px 12px', borderRadius: 30, fontWeight: 800, fontSize: '12px', marginBottom: 10 }}>
+                                                                                            {ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series} Series x ${ex.reps} Reps`}
+                                                                                        </div>
+                                                                                        {ex.note && (
+                                                                                            <div style={{ fontSize: '10px', color: '#444', background: '#f8f9fa', padding: '8px 10px', borderRadius: 8, borderLeft: '3px solid #a2d149', fontWeight: 500 }}>
+                                                                                                {ex.note}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    {currentImgUrl && (
+                                                                                        <div style={{ width: '100%', borderRadius: 16, overflow: 'hidden', background: '#fafafa', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                                                                                            <ExerciseImage src={currentImgUrl} alt={ex.name} />
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+
+                                                                {/* Rest Info */}
+                                                                <div style={{ background: '#f1f5f9', color: '#64748b', textAlign: 'center', padding: '10px', fontWeight: 800, fontSize: '11px', letterSpacing: '1px', borderTop: '1px solid #e5e7eb' }}>
+                                                                    ⌛ 3 MINUTOS DE DESCANSO DESPUÉS DE ESTE BLOQUE
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Navigation Controls */}
+                                                            <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+                                                                <button
+                                                                    disabled={currentStep === 0}
+                                                                    onClick={() => setCurrentStep(prev => prev - 1)}
+                                                                    style={{
+                                                                        flex: 1, padding: '18px', background: currentStep === 0 ? '#e5e7eb' : '#fff',
+                                                                        color: currentStep === 0 ? '#94a3b8' : '#2d4739', border: '2px solid',
+                                                                        borderColor: currentStep === 0 ? '#e5e7eb' : '#2d4739',
+                                                                        borderRadius: 16, fontWeight: 900, fontSize: '14px',
+                                                                        cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+                                                                        transition: 'all 0.2s', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'
+                                                                    }}
+                                                                >
+                                                                    ANTERIOR
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (currentStep === totalGroups - 1) {
+                                                                            setOpenDay(null);
+                                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                        } else {
+                                                                            setCurrentStep(prev => prev + 1);
+                                                                        }
+                                                                    }}
+                                                                    style={{
+                                                                        flex: 2, padding: '18px',
+                                                                        background: currentStep === totalGroups - 1 ? '#a2d149' : '#2d4739',
+                                                                        color: '#fff', border: 'none',
+                                                                        borderRadius: 16, fontWeight: 900, fontSize: '14px',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s', boxShadow: '0 10px 20px rgba(45, 71, 57, 0.2)'
+                                                                    }}
+                                                                >
+                                                                    {currentStep === totalGroups - 1 ? 'FINALIZAR ENTRENAMIENTO' : 'SIGUIENTE EJERCICIO'}
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Progress Dots */}
+                                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
+                                                                {day.groups.map((_: any, idx: number) => (
+                                                                    <div key={idx} style={{
+                                                                        width: idx === currentStep ? '24px' : '8px',
+                                                                        height: '8px',
+                                                                        borderRadius: '4px',
+                                                                        background: idx === currentStep ? '#a2d149' : '#cbd5e1',
+                                                                        transition: 'all 0.3s'
+                                                                    }} />
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
                 )}
-            </>
-        )}
 
                 {activeTab === 'profile' && (
                     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
-                        <h2 style={{ fontSize: '1.2rem', fontWeight: 900, textTransform: 'uppercase', margin: '0 0 20px 0', color: '#111', textAlign: 'center' }}>Mi Perfil de Atleta</h2>
+                        <h2 style={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', margin: '0 0 15px 0', color: '#111', textAlign: 'center' }}>Mi Perfil de Atleta</h2>
                         <div style={{
                             background: '#fff', padding: '30px', borderRadius: '24px', border: '2px solid #a2d149', boxShadow: '0 10px 30px rgba(0,0,0,0.05)'
                         }}>
@@ -506,31 +548,35 @@ const ClientRoutine = () => {
                                 <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#a2d149', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, margin: '0 auto 10px' }}>
                                     {user?.name?.[0].toUpperCase()}
                                 </div>
-                                <h3 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>{user?.name}</h3>
-                                <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: 13, fontWeight: 500 }}>{user?.email}</p>
+                                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 900 }}>{user?.name}</h3>
+                                <p style={{ margin: '2px 0 0 0', color: '#64748b', fontSize: 10, fontWeight: 500 }}>{user?.email}</p>
                             </div>
 
                             {profile ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px' }}>
-                                    <div style={{ padding: '15px', background: '#fcfaf2', borderRadius: '15px', border: '1px solid #f2e3b3' }}>
-                                        <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 5 }}>Objetivo Principal</span>
-                                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#111' }}>{profile.goal}</span>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                                    <div style={{ padding: '10px', background: '#fcfaf2', borderRadius: '10px', border: '1px solid #f2e3b3' }}>
+                                        <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 3 }}>Objetivo Principal</span>
+                                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#111' }}>{profile.goal}</span>
                                     </div>
-                                    <div style={{ padding: '15px', background: '#fcfaf2', borderRadius: '15px', border: '1px solid #f2e3b3' }}>
-                                        <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 5 }}>Peso Actual</span>
-                                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#111' }}>{profile.weight} kg</span>
+                                    <div style={{ padding: '10px', background: '#fcfaf2', borderRadius: '10px', border: '1px solid #f2e3b3' }}>
+                                        <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 3 }}>Peso Actual</span>
+                                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#111' }}>{profile.weight} kg</span>
                                     </div>
-                                    <div style={{ padding: '15px', background: '#fcfaf2', borderRadius: '15px', border: '1px solid #f2e3b3' }}>
-                                        <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 5 }}>Suscripción</span>
-                                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#111' }}>{profile.planType}</span>
+                                    <div style={{ padding: '10px', background: '#fcfaf2', borderRadius: '10px', border: '1px solid #f2e3b3' }}>
+                                        <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 3 }}>Suscripción</span>
+                                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#111' }}>{profile.planType}</span>
                                     </div>
-                                    <div style={{ padding: '15px', background: '#fcfaf2', borderRadius: '15px', border: '1px solid #f2e3b3' }}>
-                                        <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 5 }}>Vencimiento</span>
-                                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#111' }}>{profile.endDate}</span>
+                                    <div style={{ padding: '10px', background: '#fcfaf2', borderRadius: '10px', border: '1px solid #f2e3b3' }}>
+                                        <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 3 }}>Inicio de Plan</span>
+                                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#111' }}>{profile.startDate}</span>
                                     </div>
-                                    <div style={{ padding: '15px', background: '#eff6ff', borderRadius: '15px', border: '1px solid #bfdbfe', gridColumn: '1 / -1' }}>
-                                        <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#1e40af', fontWeight: 800, display: 'block', marginBottom: 5 }}>Próximo Control de Medidas</span>
-                                        <span style={{ fontSize: '18px', fontWeight: 900, color: '#1e40af' }}>{profile.controlDate}</span>
+                                    <div style={{ padding: '10px', background: '#fcfaf2', borderRadius: '10px', border: '1px solid #f2e3b3' }}>
+                                        <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#a38210', fontWeight: 800, display: 'block', marginBottom: 3 }}>Vencimiento</span>
+                                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#111' }}>{profile.endDate}</span>
+                                    </div>
+                                    <div style={{ padding: '10px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                                        <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#1e40af', fontWeight: 800, display: 'block', marginBottom: 3 }}>Próximo Control</span>
+                                        <span style={{ fontSize: '12px', fontWeight: 900, color: '#1e40af' }}>{profile.controlDate}</span>
                                     </div>
                                 </div>
                             ) : (
@@ -561,25 +607,31 @@ const ClientRoutine = () => {
                             background: '#fff', padding: '40px 30px', borderRadius: '24px', border: '2px solid #2d4739', boxShadow: '0 10px 30px rgba(0,0,0,0.05)'
                         }}>
                             <div style={{ textAlign: 'center', marginBottom: 30 }}>
-                                <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#2d4739', color: '#a2d149', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 900, margin: '0 auto 15px' }}>
-                                    {coach?.name?.[0].toUpperCase() || 'C'}
-                                </div>
+                                {coach?.profile_picture_url ? (
+                                    <div style={{ width: 100, height: 100, borderRadius: '50%', margin: '0 auto 15px', border: '4px solid #a2d149', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+                                        <img src={coach.profile_picture_url} alt={coach.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                ) : (
+                                    <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#2d4739', color: '#a2d149', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 900, margin: '0 auto 15px' }}>
+                                        {coach?.name?.[0].toUpperCase() || 'C'}
+                                    </div>
+                                )}
                                 <h3 style={{ margin: 0, fontSize: 24, fontWeight: 900 }}>{coach?.name || 'Tu Coach'}</h3>
                                 <p style={{ margin: '5px 0 0 0', color: '#64748b', fontSize: 14 }}>Entrenador Certificado Body Logic</p>
                             </div>
 
                             <p style={{ fontSize: '15px', color: '#334155', lineHeight: '1.8', marginBottom: '30px', textAlign: 'center', fontStyle: 'italic' }}>
-                                "Mi misión es guiarte hacia tu mejor versión, utilizando ciencia y disciplina para alcanzar tus metas de forma sostenible."
+                                "{coach?.presentation || "Mi misión es guiarte hacia tu mejor versión, utilizando ciencia y disciplina para alcanzar tus metas de forma sostenible."}"
                             </p>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                                 <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '16px', borderTop: '4px solid #a2d149' }}>
                                     <h4 style={{ margin: '0 0 10px 0', color: '#2d4739', fontWeight: 800, fontSize: 14 }}>MISIÓN</h4>
-                                    <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>Empoderar a través del ejercicio y crear planes inteligentes para una mentalidad resiliente.</p>
+                                    <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{coach?.mission || "Empoderar a través del ejercicio y crear planes inteligentes para una mentalidad resiliente."}</p>
                                 </div>
                                 <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '16px', borderTop: '4px solid #a2d149' }}>
                                     <h4 style={{ margin: '0 0 10px 0', color: '#2d4739', fontWeight: 800, fontSize: 14 }}>VISIÓN</h4>
-                                    <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>Ser el catalizador del cambio y ayudar a alcanzar un bienestar físico y mental sostenible.</p>
+                                    <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{coach?.vision || "Ser el catalizador del cambio y ayudar a alcanzar un bienestar físico y mental sostenible."}</p>
                                 </div>
                             </div>
                         </div>
@@ -674,28 +726,28 @@ const ClientRoutine = () => {
 
             {/* Footers Container */}
             <div style={{
-                maxWidth: 800,
+                maxWidth: 600,
                 margin: '30px auto 0 auto',
                 padding: '0 20px 50px 20px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '20px'
+                gap: '15px'
             }}>
                 {/* Social Media Footer */}
                 <div style={{
                     background: '#fff',
                     border: '2px solid #a2d149',
-                    borderRadius: 16,
-                    padding: '15px 24px',
+                    borderRadius: 12,
+                    padding: '8px 16px',
                     textAlign: 'center',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.04)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center'
                 }}>
                     <p style={{
-                        fontSize: '9px', letterSpacing: '2px', textTransform: 'uppercase',
-                        color: '#64748b', fontWeight: 800, margin: '0 0 10px 0'
+                        fontSize: '7px', letterSpacing: '1.5px', textTransform: 'uppercase',
+                        color: '#64748b', fontWeight: 800, margin: '0 0 6px 0'
                     }}>
                         Síguenos en redes sociales
                     </p>
@@ -704,10 +756,10 @@ const ClientRoutine = () => {
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
+                            display: 'flex', alignItems: 'center', gap: 8,
                             color: '#111', textDecoration: 'none',
-                            fontSize: '14px', fontWeight: 900,
-                            padding: '8px 20px', borderRadius: 12,
+                            fontSize: '11px', fontWeight: 900,
+                            padding: '4px 12px', borderRadius: 10,
                             background: '#f8fafc',
                             border: '1px solid #e2e8f0',
                             transition: 'all 0.3s'
@@ -721,7 +773,7 @@ const ClientRoutine = () => {
                             e.currentTarget.style.background = '#f8fafc';
                         }}
                     >
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <rect x="2" y="2" width="20" height="20" rx="5" stroke="#a2d149" strokeWidth="2" />
                             <circle cx="12" cy="12" r="4" stroke="#a2d149" strokeWidth="2" />
                             <circle cx="17.5" cy="6.5" r="1.2" fill="#a2d149" />
@@ -734,24 +786,24 @@ const ClientRoutine = () => {
                 <div style={{
                     background: 'linear-gradient(135deg, #111 0%, #1b3022 100%)',
                     border: '1px solid #a2d149',
-                    borderRadius: 16,
-                    padding: '20px 24px',
+                    borderRadius: 12,
+                    padding: '10px 15px',
                     textAlign: 'center',
                     boxShadow: '0 8px 32px rgba(162, 209, 73, 0.12)'
                 }}>
                     <p style={{
-                        fontSize: '9px', letterSpacing: '4px', textTransform: 'uppercase',
-                        color: '#a2d149', fontWeight: 800, margin: '0 0 6px 0'
+                        fontSize: '7px', letterSpacing: '3px', textTransform: 'uppercase',
+                        color: '#a2d149', fontWeight: 800, margin: '0 0 3px 0'
                     }}>
                         Contacta a tu Coach
                     </p>
                     <p style={{
-                        fontSize: '18px', fontWeight: 900, color: '#fff',
-                        margin: '0 0 15px 0', letterSpacing: '0.5px'
+                        fontSize: '13px', fontWeight: 900, color: '#fff',
+                        margin: '0 0 8px 0', letterSpacing: '0.5px'
                     }}>
                         {coach?.name || '—'}
                     </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: 20, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
                         {/* Instagram */}
                         {coach?.instagram && (
                             <a
@@ -759,16 +811,16 @@ const ClientRoutine = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{
-                                    display: 'flex', alignItems: 'center', gap: 8,
+                                    display: 'flex', alignItems: 'center', gap: 6,
                                     color: '#a2d149', textDecoration: 'none',
-                                    fontSize: '13px', fontWeight: 700,
+                                    fontSize: '11px', fontWeight: 700,
                                     background: 'rgba(162, 209, 73, 0.08)',
-                                    padding: '8px 16px', borderRadius: 50,
+                                    padding: '6px 12px', borderRadius: 50,
                                     border: '1px solid rgba(162, 209, 73, 0.25)',
                                     transition: 'all 0.2s'
                                 }}
                             >
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <rect x="2" y="2" width="20" height="20" rx="5" stroke="#a2d149" strokeWidth="2" />
                                     <circle cx="12" cy="12" r="4" stroke="#a2d149" strokeWidth="2" />
                                     <circle cx="17.5" cy="6.5" r="1.2" fill="#a2d149" />
@@ -783,16 +835,16 @@ const ClientRoutine = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{
-                                    display: 'flex', alignItems: 'center', gap: 8,
+                                    display: 'flex', alignItems: 'center', gap: 6,
                                     color: '#a2d149', textDecoration: 'none',
-                                    fontSize: '13px', fontWeight: 700,
+                                    fontSize: '11px', fontWeight: 700,
                                     background: 'rgba(162, 209, 73, 0.08)',
-                                    padding: '8px 16px', borderRadius: 50,
+                                    padding: '6px 12px', borderRadius: 50,
                                     border: '1px solid rgba(162, 209, 73, 0.25)',
                                     transition: 'all 0.2s'
                                 }}
                             >
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M6.6 10.8C7.8 13.2 9.8 15.2 12.2 16.4L14 14.6C14.3 14.3 14.7 14.2 15 14.4C16.1 14.8 17.3 15 18.5 15C19.3 15 20 15.7 20 16.5V19.5C20 20.3 19.3 21 18.5 21C9.9 21 3 14.1 3 5.5C3 4.7 3.7 4 4.5 4H7.5C8.3 4 9 4.7 9 5.5C9 6.7 9.2 7.9 9.6 9C9.7 9.3 9.6 9.7 9.4 10L6.6 10.8Z" stroke="#a2d149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
                                 {coach.phone}
@@ -828,6 +880,8 @@ const ClientRoutine = () => {
                     }
                 }
             `}</style>
+
+            <InfoModal isOpen={isInfoModalOpen} onClose={() => setIsInfoModalOpen(false)} />
         </div>
     );
 };

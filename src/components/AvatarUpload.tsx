@@ -56,7 +56,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ currentAvatar, onUploadSucc
     };
 
     return (
-        <div style={{ position: 'relative', width: '100px', height: '100px', margin: '0 auto' }}>
+        <div style={{ position: 'relative', width: '80px', height: '80px', margin: '0 auto' }}>
             <div style={{
                 width: '100%',
                 height: '100%',
@@ -70,10 +70,10 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ currentAvatar, onUploadSucc
                 position: 'relative'
             }}>
                 {currentAvatar ? (
-                    <img 
-                        src={`${currentAvatar}${currentAvatar.includes('?') ? '&' : '?'}t=${cacheBuster}`} 
-                        alt="Avatar" 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    <img
+                        src={`${currentAvatar}${currentAvatar.includes('?') ? '&' : '?'}t=${cacheBuster}`}
+                        alt="Avatar"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                 ) : (
                     <span style={{ fontSize: '32px', fontWeight: 900, color: '#a2d149' }}>
@@ -116,14 +116,14 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ currentAvatar, onUploadSucc
                 transition: 'transform 0.2s',
                 zIndex: 3
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
                 <Camera size={16} />
-                <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleFileChange} 
+                <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
                     style={{ display: 'none' }}
                     disabled={uploading}
                 />
