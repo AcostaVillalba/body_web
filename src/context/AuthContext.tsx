@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
 
 type Role = 'Admin' | 'Coach' | 'Client';
 
@@ -13,6 +13,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
   login: (token: string, user: User) => void;
   logout: () => void;
   updateProfilePicture: (url: string) => void;
@@ -24,6 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // Default to false, pages will trigger it
 
   useEffect(() => {
     // Check for saved session
@@ -57,8 +60,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const contextValue = useMemo(() => ({ 
+    user, 
+    token, 
+    isLoading, 
+    setIsLoading,
+    login, 
+    logout, 
+    updateProfilePicture, 
+    isAuthenticated: !!token 
+  }), [user, token, isLoading]);
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateProfilePicture, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,13 +1,16 @@
-
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Login from './pages/Login';
-import CoachDashboard from './pages/CoachDashboard';
-import ClientRoutine from './pages/ClientRoutine';
-import AdminDashboard from './pages/AdminDashboard'; // Nuevo import
+import LoadingScreen from './components/LoadingScreen';
+
+// Lazy loading components for better performance
+const CoachDashboard = lazy(() => import('./pages/CoachDashboard'));
+const ClientRoutine = lazy(() => import('./pages/ClientRoutine'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 // Component to handle root path redirect based on auth status
 const RootRedirect = () => {
@@ -24,15 +27,14 @@ const RootRedirect = () => {
   }
 };
 
-function App() {
-  console.log("App component rendered");
-  // Configuración segura usando el .env de Vite (variables prefijadas con VITE_)
-  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "FALTA_COLOCAR_ID_EN_EL_ARCHIVO_ENV";
-
+const AppContent = () => {
+  const { isLoading } = useAuth();
+  
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthProvider>
-        <Router>
+    <>
+      <LoadingScreen isLoading={isLoading} />
+      <Router>
+        <Suspense fallback={null}>
           <Routes>
             <Route path="/login" element={<Login />} />
             
@@ -55,7 +57,21 @@ function App() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </Router>
+        </Suspense>
+      </Router>
+    </>
+  );
+};
+
+function App() {
+  console.log("App component rendered");
+  // Configuración segura usando el .env de Vite (variables prefijadas con VITE_)
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "FALTA_COLOCAR_ID_EN_EL_ARCHIVO_ENV";
+
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AuthProvider>
+        <AppContent />
       </AuthProvider>
     </GoogleOAuthProvider>
   );

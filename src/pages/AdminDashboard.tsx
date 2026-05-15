@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight, DollarSign, FileText, Menu, Download } from 'lucide-react';
+import { Users, PlusCircle, Edit3, Settings, X, Save, Search, Shield, ShieldOff, Filter, ChevronDown, RotateCcw, ChevronLeft, ChevronRight, DollarSign, FileText, Menu, Download, ArrowLeft, Info } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import CoachDashboard, { type RoutineDay } from './CoachDashboard';
@@ -9,9 +9,10 @@ import logoBody2 from '../assets/logobody2.png';
 import API_URL from '../api';
 import { getImageUrl } from '../data';
 import AvatarUpload from '../components/AvatarUpload';
+import InfoModal from '../components/InfoModal';
 
 const AdminDashboard = () => {
-  const { token, logout, user } = useAuth();
+  const { token, logout, user, setIsLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'users' | 'create' | 'coaches' | 'pending_payments' | 'payment_history'>('users');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddingCoach, setIsAddingCoach] = useState(false);
@@ -23,12 +24,13 @@ const AdminDashboard = () => {
   const [newCoach, setNewCoach] = useState({ name: '', email: '', phone: '', instagram: '' });
   const [editingClientEmail, setEditingClientEmail] = useState<string | null>(null);
   const [editingRoutine, setEditingRoutine] = useState<RoutineDay[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingLocal, setIsLoadingLocal] = useState(false);
   const [editingCoachId, setEditingCoachId] = useState<number | null>(null); // Nuevo estado para editar coaches
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
   const [pendingCoachFilter, setPendingCoachFilter] = useState('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
     planType: 'all',
@@ -250,6 +252,8 @@ const AdminDashboard = () => {
       }
     } catch (e) {
       console.error("DEBUG: Fetch error (CORS or Network):", e);
+    } finally {
+      setIsLoading(false); // Disable global loading screen
     }
   };
 
@@ -309,7 +313,7 @@ const AdminDashboard = () => {
   };
 
   const handleEditRoutine = async (email: string) => {
-    setIsLoading(true);
+    setIsLoadingLocal(true);
     setEditingClientEmail(email);
     try {
       const res = await fetch(`${API_URL}/api/coach/routine/${email}`, { headers: authHeaders });
@@ -341,7 +345,7 @@ const AdminDashboard = () => {
       console.error("Error fetching routine", e);
       setEditingRoutine([]);
     } finally {
-      setIsLoading(false);
+      setIsLoadingLocal(false);
     }
   };
 
@@ -420,8 +424,9 @@ const AdminDashboard = () => {
       <div style={{ 
         position: 'fixed', 
         top: '70px', 
-        left: isMenuOpen ? 0 : '-300px', 
+        left: isMenuOpen ? 0 : '-320px', 
         width: '280px', 
+        maxWidth: '85vw', 
         height: 'calc(100vh - 70px)', 
         background: '#fff', 
         zIndex: 999, 
@@ -429,10 +434,25 @@ const AdminDashboard = () => {
         boxShadow: '4px 0 15px rgba(0,0,0,0.1)',
         display: 'flex',
         flexDirection: 'column',
-        padding: '20px 0'
+        padding: '20px 0',
+        overflowY: 'auto'
       }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '0 20px' }}>
+            <button 
+                onClick={() => setIsMenuOpen(false)}
+                style={{ 
+                    background: '#f1f5f9', border: 'none', width: 40, height: 40, borderRadius: '50%', 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                    color: '#2d4739', transition: 'all 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+            >
+                <ArrowLeft size={20} />
+            </button>
+        </div>
         <div style={{ 
-            padding: '30px 20px', 
+            padding: '15px 20px', 
             background: '#f8fafc', 
             textAlign: 'center', 
             borderBottom: '1px solid #f1f5f9' 
@@ -449,7 +469,7 @@ const AdminDashboard = () => {
             </p>
         </div>
 
-        <div style={{ flex: 1, padding: '10px 15px' }}>
+        <div style={{ flex: 1, padding: '10px 15px', overflowY: 'auto' }}>
           {[
             { id: 'users', label: 'ADMINISTRAR USUARIOS', icon: <Users size={20} /> },
             { id: 'create', label: 'CREAR RUTINA', icon: <PlusCircle size={20} /> },
@@ -465,13 +485,13 @@ const AdminDashboard = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                padding: '14px 20px',
-                marginBottom: '8px',
+                padding: '8px 16px',
+                marginBottom: '4px',
                 borderRadius: '12px',
                 border: 'none',
                 cursor: 'pointer',
-                fontWeight: 800,
-                fontSize: '13px',
+                fontWeight: 700,
+                fontSize: '11px',
                 transition: 'all 0.2s',
                 textAlign: 'left',
                 background: activeTab === tab.id ? '#f0f9ff' : 'transparent',
@@ -482,6 +502,30 @@ const AdminDashboard = () => {
               {tab.label}
             </button>
           ))}
+
+          {/* New INFO Item */}
+          <button
+            onClick={() => { setIsInfoModalOpen(true); setIsMenuOpen(false); }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '8px 16px',
+              marginTop: '12px',
+              borderRadius: '12px',
+              border: '2px solid rgba(162, 209, 73, 0.2)',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '11px',
+              transition: 'all 0.2s',
+              textAlign: 'left',
+              background: 'rgba(162, 209, 73, 0.05)',
+              color: '#a2d149'
+            }}>
+            <Info size={20} />
+            INFORMACIÓN
+          </button>
         </div>
 
         <div style={{ padding: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'center', background: '#f8fafc' }}>
@@ -559,10 +603,10 @@ const AdminDashboard = () => {
             };
 
             return (
-              <div style={{ padding: 40 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div className="admin-content-container">
+                <div className="admin-header-row">
                   <div className="section-title" style={{ marginTop: 0, marginBottom: 0 }}>Listado de Atletas ({filteredClients.length})</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="admin-actions-group">
                     <div style={{ position: 'relative' }}>
                       <button
                         onClick={() => setIsFilterOpen(!isFilterOpen)}
@@ -579,7 +623,7 @@ const AdminDashboard = () => {
                           position: 'absolute', top: '100%', right: 0, marginTop: 8, width: 280, background: '#fff',
                           borderRadius: 12, boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0', zIndex: 100, padding: 20
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                          <div className="admin-header-row" style={{ marginBottom: 25 }}>
                             <span style={{ fontSize: 13, fontWeight: 800, color: '#2d4739' }}>OPCIONES DE FILTRO</span>
                             <button
                               onClick={() => setFilters({ status: 'all', planType: 'all', dateType: 'end', dateSort: 'desc', coachId: 'all' })}
@@ -647,7 +691,7 @@ const AdminDashboard = () => {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '10px 16px', borderRadius: 8, border: '2px solid #e2e8f0', width: 320, transition: 'all 0.2s' }}>
+                    <div className="admin-search-bar">
                       <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
                       <input
                         type="text"
@@ -794,7 +838,7 @@ const AdminDashboard = () => {
 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 30, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
+                <div className="admin-pagination-row">
                     <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
                       Mostrando <span style={{ color: '#2d4739' }}>{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</span> a <span style={{ color: '#2d4739' }}>{Math.min(currentPage * ITEMS_PER_PAGE, filteredClients.length)}</span> de <span style={{ color: '#2d4739' }}>{filteredClients.length}</span> resultados
                     </div>
@@ -852,7 +896,7 @@ const AdminDashboard = () => {
           {/* TAB 1: EDITING USER */}
           {activeTab === 'users' && editingClientEmail && (
             <div style={{ padding: '0' }}>
-              {isLoading ? (
+              {isLoadingLocal ? (
                 <div style={{ padding: 100, textAlign: 'center', color: '#64748b' }}>Cargando rutina...</div>
               ) : (
                 <CoachDashboard
@@ -874,11 +918,11 @@ const AdminDashboard = () => {
 
           {/* TAB 3: COACH MANAGEMENT */}
           {activeTab === 'coaches' && (
-            <div style={{ padding: '20px' }}>
+            <div className="admin-content-container">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 25 }}>
                 
                 {/* Header & Toggle Button */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
+                <div className="admin-header-row" style={{ background: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#2d4739' }}>GESTIÓN DE EQUIPO</h2>
                     <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Administra y supervisa a los coaches de Body Logic</p>
@@ -1004,7 +1048,7 @@ const AdminDashboard = () => {
 
           {/* TAB 4: COBROS PENDIENTES */}
           {activeTab === 'pending_payments' && (
-            <div style={{ padding: 40 }}>
+            <div className="admin-content-container">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25, flexWrap: 'wrap', gap: 20 }}>
                 <div>
                   <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px' }}>COBROS PENDIENTES DE CONCILIACIÓN</h2>
@@ -1089,7 +1133,7 @@ const AdminDashboard = () => {
 
           {/* TAB 5: HISTORIAL DE PAGOS */}
           {activeTab === 'payment_history' && (
-            <div style={{ padding: 40 }}>
+            <div className="admin-content-container">
               <div style={{ marginBottom: 25 }}>
                 <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '1px' }}>HISTORIAL DE LIQUIDACIONES</h2>
                 <p style={{ margin: '5px 0 0 0', fontSize: 12, color: '#64748b', fontWeight: 600 }}>Registro de lotes pagados a coaches</p>
@@ -1265,6 +1309,8 @@ const AdminDashboard = () => {
         </div>
       )}
 
+
+      <InfoModal isOpen={isInfoModalOpen} onClose={() => setIsInfoModalOpen(false)} />
     </div>
   );
 };
