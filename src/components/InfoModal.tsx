@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Info, Users, Target, ShieldCheck } from 'lucide-react';
+import { X, Users, Target, ShieldCheck } from 'lucide-react';
 import './InfoModal.css';
 import logoBody2 from '../assets/logobody2.png';
 
