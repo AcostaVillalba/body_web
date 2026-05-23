@@ -24,8 +24,8 @@ def confirmar_pago_lote(batch_id: str) -> bool:
     """
     db = get_bq_db()
     
-    # 1. Obtener los pagos del lote para conocer los IDs de los atletas
-    sql_get = f"SELECT client_id FROM `{PROJECT_ID}.{DATASET_ID}.payments` WHERE batch_id = @batch_id"
+    # 1. Obtener los pagos del lote para conocer los IDs de los atletas y el coach_id
+    sql_get = f"SELECT client_id, coach_id FROM `{PROJECT_ID}.{DATASET_ID}.payments` WHERE batch_id = @batch_id"
     params_get = [bigquery.ScalarQueryParameter("batch_id", "STRING", batch_id)]
     payments = db.query(sql_get, params_get)
     
@@ -48,6 +48,12 @@ def confirmar_pago_lote(batch_id: str) -> bool:
             client_id = p.get("client_id")
             if client_id:
                 db.update_user_status(client_id, True)
+                
+        # 4. Marcar al coach como activo en BigQuery
+        if payments:
+            coach_id = payments[0].get("coach_id")
+            if coach_id:
+                db.update_user_status(coach_id, True)
                 
         return True
     except Exception as e:

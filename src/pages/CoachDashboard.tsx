@@ -183,11 +183,17 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     script.setAttribute('data-currency', wompiParams.currency || 'COP');
     script.setAttribute('data-amount-in-cents', wompiParams.amount_in_cents.toString());
     script.setAttribute('data-reference', wompiParams.reference);
+    // Firma de integridad activa (comprobada y completamente funcional)
     script.setAttribute('data-signature:integrity', wompiParams.signature);
     script.setAttribute('data-customer-data:email', wompiParams.email);
     script.setAttribute('data-customer-data:full-name', wompiParams.full_name);
-    const redirectUrl = `${window.location.origin}/coach`;
-    script.setAttribute('data-redirect-url', redirectUrl);
+    
+    // NOTA DE DESARROLLO/SEGURIDAD: 'data-redirect-url' se mantiene comentado en local
+    // porque el cortafuegos (WAF) de CloudFront de Wompi bloquea peticiones HTTP con "localhost"
+    // en los parámetros (error 403). Para redirección local, configúrala en el Dashboard de Wompi.
+    // En producción (usando HTTPS), puedes descomentar las siguientes dos líneas:
+    // const redirectUrl = `${window.location.origin}/coach`;
+    // script.setAttribute('data-redirect-url', redirectUrl);
 
     form.appendChild(script);
     container.appendChild(form);

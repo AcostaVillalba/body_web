@@ -23,9 +23,8 @@ class PrepararPagoResponse(BaseModel):
 def preparar_pago(current_user=Depends(auth.get_current_active_coach)):
     """
     Endpoint para coaches. Consulta el saldo pendiente de sus atletas, 
-    agrupa los cobros en un lote (batch_id), obtiene el token de aceptación de WOMPI,
-    genera la firma de integridad de la transacción y retorna los datos necesarios
-    para inicializar el widget de pago en el frontend.
+    agrupa los cobros en un lote (batch_id), genera la firma de integridad de la transacción 
+    y retorna los datos necesarios para inicializar el widget de pago en el frontend.
     """
     # 1. Obtener el saldo pendiente
     saldo_pendiente = obtener_saldo_pendiente_coach(current_user.id)
@@ -43,21 +42,13 @@ def preparar_pago(current_user=Depends(auth.get_current_active_coach)):
     db = get_bq_db()
     db.prepare_pending_payments_batch(current_user.id, batch_id)
     
-    # 4. Obtener token de aceptación y generar firma
+    # 4. Generar firma (el widget de Wompi obtiene el token de aceptación de forma interna)
     wompi_service = WompiService()
-    try:
-        acceptance_token = wompi_service.obtener_token_aceptacion()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error al obtener el token de aceptación de WOMPI: {str(e)}"
-        )
-    
     amount_in_cents = saldo_pendiente * 100
     signature = wompi_service.generar_firma_integridad(batch_id, amount_in_cents)
     
     return PrepararPagoResponse(
-        acceptance_token=acceptance_token,
+        acceptance_token="",  # El widget de Wompi maneja esto internamente
         public_key=wompi_service.public_key or "",
         signature=signature,
         reference=batch_id,
@@ -82,6 +73,15 @@ async def wompi_webhook(request: Request):
         )
         
     print(f"DEBUG: Webhook WOMPI recibido: {payload}")
+    
+    # Validar autenticidad del webhook mediante firma
+    wompi_service = WompiService()
+    if not wompi_service.verificar_firma_webhook(payload):
+        print("WARNING: Webhook de WOMPI recibido con firma inválida o no verificable.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Firma del webhook inválida."
+        )
     
     event = payload.get("event")
     if event == "transaction.updated":
