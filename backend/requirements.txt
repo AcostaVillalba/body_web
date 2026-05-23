@@ -10,3 +10,4 @@ python-jose
 python-multipart
 Pillow
 google-cloud-storage
+requests
