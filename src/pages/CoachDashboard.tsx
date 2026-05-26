@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { EXERCISES_DB, getImageUrl, preloadImage } from '../data';
 import { Users, User, PlusCircle, Search, Eye, ArrowLeft, ShieldOff, DollarSign, Filter, RotateCcw, Bell, Menu, X, ChevronDown, ChevronUp, FileText, Shield, Info, Mail, Phone, Save, Edit2, LogOut } from 'lucide-react';
@@ -61,8 +62,18 @@ export interface CoachDashboardProps {
 
 export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideHeader, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) {
   const { token, logout, user, setIsLoading } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const transactionId = searchParams.get('id');
+
+  const [wompiLoading, setWompiLoading] = useState(false);
+  const [wompiParams, setWompiParams] = useState<any>(null);
+  const [wompiError, setWompiError] = useState<string | null>(null);
+
+  const [checkingTransaction, setCheckingTransaction] = useState(false);
+  const [transactionResult, setTransactionResult] = useState<any>(null);
+
   const [activeTab, setActiveTab] = useState<'create' | 'users' | 'payments' | 'payment_history' | 'profile'>(preloadedEmail ? 'create' : 'create');
-  
+
   useEffect(() => {
     console.log("CoachDashboard V2 Loaded, Tab:", activeTab);
   }, [activeTab]);
@@ -148,6 +159,105 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
   useEffect(() => {
     if (user) fetchNotifications();
   }, [user]);
+
+  // WOMPI payment initialization and redirection effects
+  useEffect(() => {
+    if (transactionId) {
+      setActiveTab('payments');
+      checkTransactionStatus(transactionId);
+    }
+  }, [transactionId]);
+
+  useEffect(() => {
+    if (!wompiParams) return;
+
+    const container = document.getElementById('wompi-widget-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const form = document.createElement('form');
+    const script = document.createElement('script');
+    script.src = "https://checkout.wompi.co/widget.js";
+    script.setAttribute('data-render', 'button');
+    script.setAttribute('data-public-key', wompiParams.public_key);
+    script.setAttribute('data-currency', wompiParams.currency || 'COP');
+    script.setAttribute('data-amount-in-cents', wompiParams.amount_in_cents.toString());
+    script.setAttribute('data-reference', wompiParams.reference);
+    // Firma de integridad activa (comprobada y completamente funcional)
+    script.setAttribute('data-signature:integrity', wompiParams.signature);
+    script.setAttribute('data-customer-data:email', wompiParams.email);
+    script.setAttribute('data-customer-data:full-name', wompiParams.full_name);
+    
+    // NOTA DE DESARROLLO/SEGURIDAD: 'data-redirect-url' se mantiene comentado en local
+    // porque el cortafuegos (WAF) de CloudFront de Wompi bloquea peticiones HTTP con "localhost"
+    // en los parámetros (error 403). Para redirección local, configúrala en el Dashboard de Wompi.
+    // En producción (usando HTTPS), puedes descomentar las siguientes dos líneas:
+    // const redirectUrl = `${window.location.origin}/coach`;
+    // script.setAttribute('data-redirect-url', redirectUrl);
+
+    form.appendChild(script);
+    container.appendChild(form);
+
+    // Auto click to trigger Wompi modal checkout instantly
+    const interval = setInterval(() => {
+      const btn = form.querySelector('button');
+      if (btn) {
+        btn.click();
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [wompiParams]);
+
+  const handlePayWithWompi = async () => {
+    setWompiLoading(true);
+    setWompiError(null);
+    setWompiParams(null);
+    try {
+      const res = await fetch(`${API_URL}/api/wompi/preparar-pago`, {
+        method: 'POST',
+        headers: authHeaders
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || "Error al preparar el pago seguro.");
+      }
+      const data = await res.json();
+      setWompiParams(data);
+    } catch (err: any) {
+      console.error(err);
+      setWompiError(err.message || "Error al conectar con la pasarela de pagos.");
+    } finally {
+      setWompiLoading(false);
+    }
+  };
+
+  const checkTransactionStatus = async (txId: string) => {
+    setCheckingTransaction(true);
+    setTransactionResult(null);
+    try {
+      const res = await fetch(`${API_URL}/api/wompi/transaccion/${txId}`);
+      if (!res.ok) throw new Error("Error al consultar el estado del pago.");
+      const data = await res.json();
+      setTransactionResult(data);
+      if (data.status === 'APPROVED') {
+        fetchPayments();
+      }
+    } catch (err: any) {
+      console.error(err);
+      setTransactionResult({ status: 'ERROR', message: err.message });
+    } finally {
+      setCheckingTransaction(false);
+    }
+  };
+
+  const handleClearTransactionId = () => {
+    setSearchParams({});
+    setTransactionResult(null);
+  };
 
   const markNotifRead = async (id: number | string) => {
     if (typeof id === 'string') {
@@ -424,22 +534,6 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     if (activeTab === 'payment_history') fetchPaymentHistory();
     if (activeTab === 'profile') fetchCoachProfile();
   }, [activeTab]);
-
-  const handlePayBalance = async () => {
-    if (!window.confirm("¿Confirmas que has pagado el saldo pendiente al administrador?")) return;
-    try {
-      const res = await fetch(`${API_URL}/api/coach/payments/pay`, {
-        method: 'POST',
-        headers: authHeaders
-      });
-      if (res.ok) {
-        setStatusMsg({ type: 'success', text: 'Saldo marcado como pagado exitosamente' });
-        fetchPayments();
-      }
-    } catch (e) {
-      setStatusMsg({ type: 'error', text: 'Error al procesar el pago' });
-    }
-  };
 
   const handleClientSelect = (email: string) => {
     setIsRenewalActive(false);
@@ -849,14 +943,14 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                     </>
                   )}
                 </div>
-                <button 
-                  onClick={logout} 
+                <button
+                  onClick={logout}
                   className="compact-mobile"
-                  style={{ 
-                    background: '#333', color: '#f87171', border: 'none', 
-                    padding: '8px 16px', borderRadius: 10, fontSize: '11px', 
-                    fontWeight: 800, cursor: 'pointer', display: 'flex', 
-                    alignItems: 'center', gap: 8, transition: 'all 0.2s' 
+                  style={{
+                    background: '#333', color: '#f87171', border: 'none',
+                    padding: '8px 16px', borderRadius: 10, fontSize: '11px',
+                    fontWeight: 800, cursor: 'pointer', display: 'flex',
+                    alignItems: 'center', gap: 8, transition: 'all 0.2s'
                   }}
                   onMouseOver={e => e.currentTarget.style.background = '#444'}
                   onMouseOut={e => e.currentTarget.style.background = '#333'}
@@ -1028,6 +1122,116 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
           {activeTab === 'payments' ? (
             <div style={{ padding: '0 0 20px 0' }}>
               <h2 className="section-title">Control de Pago a Body Logic</h2>
+
+              {/* Wompi Hidden Iframe / Widget Container */}
+              <div id="wompi-widget-container" style={{ display: 'none' }}></div>
+
+              {/* Status and Feedback Alerts */}
+              {checkingTransaction && (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: 12,
+                  padding: '25px 20px',
+                  textAlign: 'center',
+                  marginBottom: 25,
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12
+                }}>
+                  <div style={{
+                    border: '4px solid rgba(45, 71, 57, 0.1)',
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    borderLeftColor: '#a2d149',
+                    animation: 'spin 1s linear infinite',
+                  }} />
+                  <style>{`
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}</style>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#2d4739' }}>
+                    Verificando estado de tu pago en WOMPI...
+                  </h3>
+                  <p style={{ margin: 0, fontSize: 11, color: '#64748b', fontWeight: 500 }}>
+                    Por favor no cierres ni recargues la página mientras consultamos al servidor.
+                  </p>
+                </div>
+              )}
+
+              {transactionResult && (
+                <div style={{
+                  background: transactionResult.status === 'APPROVED' ? '#f0fdf4' : (transactionResult.status === 'PENDING' ? '#fffbeb' : '#fef2f2'),
+                  border: `1px solid ${transactionResult.status === 'APPROVED' ? '#bbf7d0' : (transactionResult.status === 'PENDING' ? '#fef3c7' : '#fecaca')}`,
+                  color: transactionResult.status === 'APPROVED' ? '#166534' : (transactionResult.status === 'PENDING' ? '#92400e' : '#991b1b'),
+                  borderRadius: 12,
+                  padding: 20,
+                  marginBottom: 25,
+                  position: 'relative',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+                  animation: 'fadeIn 0.3s ease-out'
+                }}>
+                  <button
+                    onClick={handleClearTransactionId}
+                    style={{
+                      position: 'absolute',
+                      top: 15,
+                      right: 15,
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      fontWeight: 900
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {transactionResult.status === 'APPROVED' ? '🎉 ¡Pago Aprobado Exitosamente!' :
+                      transactionResult.status === 'PENDING' ? '⏳ Pago en Proceso' : '❌ Pago no Completado'}
+                  </h3>
+                  <p style={{ margin: '0 0 15px 0', fontSize: 12, fontWeight: 500, lineHeight: 1.5 }}>
+                    {transactionResult.status === 'APPROVED' ?
+                      'El pago de tu saldo pendiente ha sido validado. Tu cuenta se encuentra activa y todos tus atletas asociados han sido renovados.' :
+                      transactionResult.status === 'PENDING' ?
+                        'WOMPI está procesando la transacción de forma asíncrona. Esto puede tomar unos minutos dependiendo del banco.' :
+                        `La transacción no pudo ser completada. Razón: ${transactionResult.status || 'Rechazada por el procesador'}. Por favor, vuelve a intentarlo.`}
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, background: 'rgba(255, 255, 255, 0.6)', padding: 12, borderRadius: 8, fontSize: 11, fontWeight: 600 }}>
+                    <div><strong>Referencia de Lote:</strong> {transactionResult.reference}</div>
+                    <div><strong>ID WOMPI:</strong> {transactionResult.id}</div>
+                    <div><strong>Monto:</strong> ${(transactionResult.amount_in_cents / 100).toLocaleString()} {transactionResult.currency || 'COP'}</div>
+                    {transactionResult.payment_method_type && <div><strong>Método:</strong> {transactionResult.payment_method_type}</div>}
+                  </div>
+                </div>
+              )}
+
+              {wompiError && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  borderRadius: 12,
+                  padding: 15,
+                  marginBottom: 25,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>⚠️ {wompiError}</span>
+                  <button onClick={() => setWompiError(null)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 900 }}>✕</button>
+                </div>
+              )}
+
               <div style={{ background: '#fff', borderRadius: 12, padding: 25, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 30 }}>
                   <div style={{ background: '#fee2e2', padding: 20, borderRadius: 12, border: '1px solid #fecaca' }}>
@@ -1087,13 +1291,22 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                 {payments.some(p => p.status === 'Pending') && (
                   <div style={{ marginTop: 30, display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={handlePayBalance}
+                      onClick={handlePayWithWompi}
+                      disabled={wompiLoading || checkingTransaction}
                       style={{
-                        background: '#2d4739', color: '#fff', border: 'none', padding: '15px 30px',
-                        borderRadius: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+                        background: '#2d4739',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '15px 30px',
+                        borderRadius: 12,
+                        fontWeight: 800,
+                        cursor: (wompiLoading || checkingTransaction) ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
+                        opacity: (wompiLoading || checkingTransaction) ? 0.7 : 1,
+                        transition: 'opacity 0.2s'
                       }}
                     >
-                      PAGAR SALDO PENDIENTE (${payments.filter(p => p.status === 'Pending').reduce((acc, p) => acc + p.amount, 0).toLocaleString()})
+                      {wompiLoading ? 'PREPARANDO ENTORNO SEGURO...' : `PAGAR SALDO PENDIENTE (${payments.filter(p => p.status === 'Pending').reduce((acc, p) => acc + p.amount, 0).toLocaleString()} COP)`}
                     </button>
                   </div>
                 )}

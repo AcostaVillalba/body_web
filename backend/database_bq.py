@@ -4,10 +4,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from google.cloud import bigquery
 from google.oauth2 import service_account
-
-PROJECT_ID = "body-web-491923"
-DATASET_ID = "bodybyja_analytics"
-CREDENTIALS_PATH = os.path.join(os.path.dirname(__file__), "secrets", "credentials.json")
+from config.database import client, PROJECT_ID, DATASET_ID
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 
@@ -16,11 +13,8 @@ def now_bogota():
 
 class BigQueryDB:
     def __init__(self):
-        if os.path.exists(CREDENTIALS_PATH):
-            credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_PATH)
-            self.client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
-        else:
-            self.client = bigquery.Client(project=PROJECT_ID)
+        self.client = client
+
 
     def query(self, sql, params=None):
         job_config = bigquery.QueryJobConfig(query_parameters=params) if params else None
@@ -321,6 +315,17 @@ class BigQueryDB:
         ]
         self.query(sql, params)
         return True
+
+    def prepare_pending_payments_batch(self, coach_id, batch_id):
+        sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.payments` SET batch_id = @batch_id " \
+              f"WHERE coach_id = @coach_id AND status = 'Pending'"
+        params = [
+            bigquery.ScalarQueryParameter("batch_id", "STRING", batch_id),
+            bigquery.ScalarQueryParameter("coach_id", "INTEGER", coach_id)
+        ]
+        self.query(sql, params)
+        return True
+
 
     def update_profile_picture(self, user_id, url):
         sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.users` SET profile_picture_url = @url WHERE id = @id"

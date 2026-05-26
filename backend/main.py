@@ -1,10 +1,13 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from google.cloud import bigquery
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Union, Any
 from datetime import datetime, timedelta, timezone
-import os
 import uuid
 import time
 from database_bq import get_bq_db, now_bogota, PROJECT_ID
@@ -12,8 +15,11 @@ import auth
 from PIL import Image
 from io import BytesIO
 from google.cloud import storage
+from routes.wompi import router as wompi_router
 
 app = FastAPI(title="Body Logic BigQuery Server")
+app.include_router(wompi_router, prefix="/api/wompi", tags=["Wompi"])
+
 
 # Configuración de CORS
 origins = [
