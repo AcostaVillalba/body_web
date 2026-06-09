@@ -6,13 +6,18 @@ from fastapi.security import OAuth2PasswordBearer
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-# In a real app, you would load these from a .env file
-SECRET_KEY = os.getenv("SECRET_KEY", "SUPER_SECRET_BODYLOGIC_KEY_CHANGE_ME")
+# Load and strictly validate environment variables
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY or SECRET_KEY.strip() == "" or SECRET_KEY == "SUPER_SECRET_BODYLOGIC_KEY_CHANGE_ME":
+    raise RuntimeError("SECRET_KEY environment variable is missing, empty, or using the default insecure value.")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # Google OAuth Client ID
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "YOUR_GOOGLE_CLIENT_ID_HERE") 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+if not GOOGLE_CLIENT_ID or GOOGLE_CLIENT_ID.strip() == "" or GOOGLE_CLIENT_ID == "YOUR_GOOGLE_CLIENT_ID_HERE":
+    raise RuntimeError("GOOGLE_CLIENT_ID environment variable is missing, empty, or using the default value.")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
