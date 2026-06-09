@@ -10,7 +10,7 @@ from typing import List, Optional, Union, Any
 from datetime import datetime, timedelta, timezone
 import uuid
 import time
-from database_bq import get_bq_db, now_bogota, PROJECT_ID
+from database_bq import get_bq_db, now_bogota, PROJECT_ID, BOGOTA_TZ
 import auth
 from PIL import Image
 from io import BytesIO
@@ -150,6 +150,56 @@ def get_clients(current_user=Depends(auth.get_current_active_coach)):
             unique_users.append(u)
             seen_ids.add(u['id'])
 
+    # 1. Obtener la última rutina de cada atleta
+    # Usamos ROW_NUMBER() para obtener sólo la más reciente de cada user_id
+    from database_bq import PROJECT_ID, DATASET_ID
+    sql_latest_routines = f"""
+        SELECT user_id, routine_data 
+        FROM (
+            SELECT user_id, routine_data, ROW_NUMBER() OVER(PARTITION BY user_id ORDER BY created_at DESC) as rn 
+            FROM `{PROJECT_ID}.{DATASET_ID}.routines`
+        ) 
+        WHERE rn = 1
+    """
+    routines_rows = db.query(sql_latest_routines)
+    
+    # Mapeo de user_id -> conjunto de días activos en minúscula
+    import json
+    active_days_map = {}
+    for r in routines_rows:
+        u_id = r.get("user_id")
+        r_data_str = r.get("routine_data")
+        if u_id and r_data_str:
+            try:
+                r_days = json.loads(r_data_str)
+                active_days_map[u_id] = {d.get("name", "").strip().lower() for d in r_days}
+            except Exception:
+                active_days_map[u_id] = set()
+                
+    # 2. Obtener todas las calificaciones de entrenamientos (workout_logs)
+    sql_workout_logs = f"SELECT user_id, day_name, stars FROM `{PROJECT_ID}.{DATASET_ID}.workout_logs`"
+    logs_rows = db.query(sql_workout_logs)
+    
+    # Agrupar las estrellas por user_id considerando sólo los días activos
+    user_stars = {}
+    for log in logs_rows:
+        u_id = log.get("user_id")
+        day_clean = log.get("day_name", "").strip().lower()
+        stars_val = log.get("stars")
+        
+        if u_id and day_clean and stars_val is not None:
+            # Si el usuario tiene rutina y el día está en la rutina activa
+            if u_id in active_days_map and day_clean in active_days_map[u_id]:
+                if u_id not in user_stars:
+                    user_stars[u_id] = []
+                user_stars[u_id].append(stars_val)
+                
+    # Calcular promedio por usuario
+    avg_ratings_map = {}
+    for u_id, stars_list in user_stars.items():
+        if stars_list:
+            avg_ratings_map[u_id] = round(sum(stars_list) / len(stars_list), 1)
+
     results = []
     today = now_bogota().strftime("%Y-%m-%d")
     for u in unique_users:
@@ -177,7 +227,8 @@ def get_clients(current_user=Depends(auth.get_current_active_coach)):
                 "controlDate": u['control_date'] or ""
             },
             "is_active": is_active,
-            "coach_id": u['coach_id']
+            "coach_id": u['coach_id'],
+            "avg_rating": avg_ratings_map.get(u['id'], None)
         })
     return results
 
@@ -257,7 +308,40 @@ def get_client_routine_by_coach(client_email: str, current_user=Depends(auth.get
     user = db.get_user_by_email(client_email)
     if not user: return {"status": "empty"}
     routine = db.get_latest_routine(user['id'])
-    return {"status": "success", "routine_data": routine['routine_data'] if routine else None}
+    
+    # Obtener el promedio de calificación por día de entrenamiento
+    from database_bq import PROJECT_ID, DATASET_ID
+    sql_ratings = f"""
+        SELECT day_name, AVG(stars) as avg_rating 
+        FROM `{PROJECT_ID}.{DATASET_ID}.workout_logs` 
+        WHERE user_id = @user_id 
+        GROUP BY day_name
+    """
+    params = [bigquery.ScalarQueryParameter("user_id", "INTEGER", user['id'])]
+    ratings_rows = db.query(sql_ratings, params)
+    
+    # Formatear como un diccionario {day_name: float} redondeado a 1 decimal
+    ratings_by_day = {}
+    for row in ratings_rows:
+        day_name = row.get("day_name")
+        avg_val = row.get("avg_rating")
+        if day_name and avg_val is not None:
+            ratings_by_day[day_name] = round(float(avg_val), 1)
+            
+    return {
+        "status": "success", 
+        "routine_data": routine['routine_data'] if routine else None,
+        "ratings_by_day": ratings_by_day
+    }
+
+@app.get("/api/coach/client/weight-history/{client_email}")
+def get_client_weight_history_by_coach(client_email: str, current_user=Depends(auth.get_current_active_coach)):
+    db = get_bq_db()
+    user = db.get_user_by_email(client_email)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    history = db.get_weight_history(user['id'])
+    return [{"id": h['id'], "weight": h['weight'], "date": h['created_at'].strftime("%Y-%m-%d"), "notes": h['notes']} for h in history]
 
 @app.get("/api/client/my-routine")
 def get_my_routine(current_user=Depends(auth.get_current_user)):
@@ -489,6 +573,176 @@ async def upload_profile_picture(
     except Exception as e:
         print(f"Error uploading profile picture: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar la imagen: {str(e)}")
+
+class WorkoutCompleteReq(BaseModel):
+    day_name: str
+    stars: int
+
+@app.post("/api/client/workouts/complete")
+def complete_workout(req: WorkoutCompleteReq, current_user=Depends(auth.get_current_user)):
+    if req.stars < 1 or req.stars > 5:
+        raise HTTPException(status_code=400, detail="La calificación debe estar entre 1 y 5 estrellas.")
+    db = get_bq_db()
+    success = db.log_completed_workout(current_user.id, req.day_name, req.stars)
+    if not success:
+        raise HTTPException(status_code=500, detail="No se pudo registrar la finalización del entrenamiento.")
+    return {"status": "success", "message": "Entrenamiento completado registrado con éxito."}
+
+@app.get("/api/client/workouts/streak")
+def get_workout_streak(current_user=Depends(auth.get_current_user)):
+    import json
+    from datetime import timedelta as py_timedelta
+    
+    db = get_bq_db()
+    routine = db.get_latest_routine(current_user.id)
+    completed_logs = db.get_completed_workouts(current_user.id)
+    
+    total_workouts = len(completed_logs)
+    
+    if not routine:
+        return {
+            "streak": 0,
+            "total_workouts": total_workouts,
+            "badge": "Ninguna",
+            "next_badge": "Bronce",
+            "next_badge_target": 5,
+            "progress_message": "¡Completa tu rutina de hoy para poner en marcha tu racha y conseguir tu primera medalla! 🚀",
+            "scheduled_days": []
+        }
+    
+    try:
+        routine_days = json.loads(routine['routine_data'])
+    except Exception:
+        routine_days = []
+        
+    SPANISH_DAYS = {
+        "lunes": 0, "martes": 1, "miercoles": 2, "miércoles": 2,
+        "jueves": 3, "viernes": 4, "sabado": 5, "sábado": 5,
+        "domingo": 6
+    }
+    
+    scheduled_weekdays = []
+    scheduled_day_names = []
+    for d in routine_days:
+        name_clean = d.get('name', '').strip().lower()
+        if name_clean in SPANISH_DAYS:
+            scheduled_weekdays.append(SPANISH_DAYS[name_clean])
+            scheduled_day_names.append(d.get('name'))
+            
+    scheduled_weekdays = sorted(list(set(scheduled_weekdays)))
+    
+    # Si la rutina no tiene días válidos de la semana
+    if not scheduled_weekdays:
+        return {
+            "streak": 0,
+            "total_workouts": total_workouts,
+            "badge": "Ninguna",
+            "next_badge": "Bronce",
+            "next_badge_target": 5,
+            "progress_message": "¡Completa tu rutina de hoy para poner en marcha tu racha y conseguir tu primera medalla! 🚀",
+            "scheduled_days": []
+        }
+        
+    # Obtener fechas de completado en Bogotá timezone
+    completed_dates = set()
+    for log in completed_logs:
+        dt = log.get('completed_at')
+        if dt:
+            if isinstance(dt, str):
+                if dt.endswith('Z'):
+                    dt = dt.replace('Z', '+00:00')
+                from datetime import datetime
+                try:
+                    dt = datetime.fromisoformat(dt)
+                except Exception:
+                    continue
+            try:
+                dt_bogota = dt.astimezone(BOGOTA_TZ)
+                completed_dates.add(dt_bogota.strftime("%Y-%m-%d"))
+            except Exception:
+                pass
+                
+    # Calcular racha caminando hacia atrás en el tiempo
+    today_dt = now_bogota()
+    today_date = today_dt.date()
+    
+    current_date = today_date
+    streak = 0
+    active = True
+    max_lookback = 1000
+    lookback_days = 0
+    used_completion_dates = set()
+    
+    while active and lookback_days < max_lookback:
+        weekday = current_date.weekday()
+        date_str = current_date.strftime("%Y-%m-%d")
+        next_day = current_date + py_timedelta(days=1)
+        next_day_str = next_day.strftime("%Y-%m-%d")
+        
+        if weekday in scheduled_weekdays:
+            date_str_available = date_str in completed_dates and date_str not in used_completion_dates
+            next_day_str_available = next_day_str in completed_dates and next_day_str not in used_completion_dates
+            
+            if date_str_available:
+                streak += 1
+                used_completion_dates.add(date_str)
+            elif next_day_str_available:
+                streak += 1
+                used_completion_dates.add(next_day_str)
+            else:
+                if current_date == today_date:
+                    # Si es hoy y no lo ha completado, no rompemos la racha todavía
+                    pass
+                else:
+                    # Día de entrenamiento pasado no completado: se rompe la racha
+                    active = False
+        else:
+            # Día de descanso, lo ignoramos
+            pass
+            
+        current_date -= py_timedelta(days=1)
+        lookback_days += 1
+        
+    MEDALS = [
+        {"name": "Ninguna", "min": 0, "next_name": "Bronce", "target": 5},
+        {"name": "Bronce", "min": 5, "next_name": "Plata", "target": 10},
+        {"name": "Plata", "min": 10, "next_name": "Oro", "target": 20},
+        {"name": "Oro", "min": 20, "next_name": "Zafiro", "target": 30},
+        {"name": "Zafiro", "min": 30, "next_name": "Rubí", "target": 40},
+        {"name": "Rubí", "min": 40, "next_name": "Esmeralda", "target": 50},
+        {"name": "Esmeralda", "min": 50, "next_name": "Amatista", "target": 60},
+        {"name": "Amatista", "min": 60, "next_name": "Perla", "target": 70},
+        {"name": "Perla", "min": 70, "next_name": "Obsidiana", "target": 80},
+        {"name": "Obsidiana", "min": 80, "next_name": "Diamante", "target": 100},
+        {"name": "Diamante", "min": 100, "next_name": None, "target": None}
+    ]
+    
+    active_medal = MEDALS[0]
+    for m in MEDALS:
+        if streak >= m["min"]:
+            active_medal = m
+            
+    badge = active_medal["name"]
+    next_badge = active_medal["next_name"]
+    next_badge_target = active_medal["target"]
+    
+    if streak == 0:
+        progress_message = "¡Completa tu rutina de hoy para poner en marcha tu racha y conseguir tu primera medalla! 🚀"
+    elif next_badge:
+        days_needed = next_badge_target - streak
+        progress_message = f"¡Llevas {streak} días de racha! Te faltan {days_needed} días de racha para obtener la medalla de {next_badge}."
+    else:
+        progress_message = "¡Felicidades! Has alcanzado la medalla de Diamante, el rango máximo. 💎"
+        
+    return {
+        "streak": streak,
+        "total_workouts": total_workouts,
+        "badge": badge,
+        "next_badge": next_badge,
+        "next_badge_target": next_badge_target,
+        "progress_message": progress_message,
+        "scheduled_days": scheduled_day_names
+    }
 
 @app.get("/")
 def read_root():

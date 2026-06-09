@@ -8,6 +8,13 @@ import AvatarUpload from '../components/AvatarUpload';
 import InfoModal from '../components/InfoModal';
 import API_URL from '../api';
 
+const MONTH_NAMES_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const formatDateSpanish = (dateObj: Date) => {
+    const day = dateObj.getDate();
+    const month = MONTH_NAMES_SHORT[dateObj.getMonth()];
+    return `${day} ${month}`;
+};
+
 const ClientRoutine = () => {
     const { user, token, logout, setIsLoading } = useAuth();
     const [routineDays, setRoutineDays] = useState<any[]>([]);
@@ -16,6 +23,8 @@ const ClientRoutine = () => {
     const [openDay, setOpenDay] = useState<string | null>(null);
     const [showWeightHistory, setShowWeightHistory] = useState(false);
     const [weightHistory, setWeightHistory] = useState<any[]>([]);
+    const [weightFilter, setWeightFilter] = useState<'month' | 'year'>('month');
+    const [hoveredPoint, setHoveredPoint] = useState<any>(null);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [coach, setCoach] = useState<any>(null);
     const [currentStep, setCurrentStep] = useState(0);
@@ -23,6 +32,78 @@ const ClientRoutine = () => {
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'routine' | 'profile' | 'coach' | 'rules'>('routine');
     const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+    // Streak & Badges State
+    const [showRatingModal, setShowRatingModal] = useState(false);
+    const [ratingDayName, setRatingDayName] = useState<string | null>(null);
+    const [selectedStars, setSelectedStars] = useState(0);
+    const [submittingRating, setSubmittingRating] = useState(false);
+    const [ratingSuccess, setRatingSuccess] = useState(false);
+    const [hoveredStars, setHoveredStars] = useState(0);
+    const [streakData, setStreakData] = useState<any>({
+        streak: 0,
+        total_workouts: 0,
+        badge: 'Ninguna',
+        next_badge: 'Bronce',
+        next_badge_target: 5,
+        progress_message: '¡Completa tu rutina de hoy para poner en marcha tu racha y conseguir tu primera medalla! 🚀'
+    });
+
+    const fetchStreak = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/client/workouts/streak`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setStreakData(data);
+            }
+        } catch (err) {
+            console.error("Failed to load streak data", err);
+        }
+    };
+
+    const handleCompleteWorkout = async () => {
+        if (!ratingDayName || selectedStars < 1 || selectedStars > 5) return;
+        setSubmittingRating(true);
+        try {
+            const res = await fetch(`${API_URL}/api/client/workouts/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    day_name: ratingDayName,
+                    stars: selectedStars
+                })
+            });
+            if (res.ok) {
+                setRatingSuccess(true);
+                fetchStreak();
+                setTimeout(() => {
+                    setShowRatingModal(false);
+                    setRatingSuccess(false);
+                    setSelectedStars(0);
+                    setOpenDay(null);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }, 1500);
+            } else {
+                alert("Error al registrar el entrenamiento. Inténtalo de nuevo.");
+            }
+        } catch (err) {
+            console.error("Error completing workout", err);
+            alert("Error de conexión. Inténtalo de nuevo.");
+        } finally {
+            setSubmittingRating(false);
+        }
+    };
+
+    useEffect(() => {
+        if (token) {
+            fetchStreak();
+        }
+    }, [token]);
 
     useEffect(() => {
         const fetchRoutine = async () => {
@@ -148,6 +229,22 @@ const ClientRoutine = () => {
             if (found) return group;
         }
         return '';
+    };
+
+    const getMedalColor = (medalName: string) => {
+        switch (medalName) {
+            case 'Bronce': return { bg: '#fff7ed', border: '#fdba74', text: '#c2410c', icon: '🥉' };
+            case 'Plata': return { bg: '#f1f5f9', border: '#cbd5e1', text: '#475569', icon: '🥈' };
+            case 'Oro': return { bg: '#fefcbf', border: '#facc15', text: '#a16207', icon: '🥇' };
+            case 'Zafiro': return { bg: '#eff6ff', border: '#93c5fd', text: '#1d4ed8', icon: '🔷' };
+            case 'Rubí': return { bg: '#fff1f2', border: '#fda4af', text: '#be123c', icon: '♦️' };
+            case 'Esmeralda': return { bg: '#f0fdf4', border: '#86efac', text: '#15803d', icon: '🟢' };
+            case 'Amatista': return { bg: '#faf5ff', border: '#d8b4fe', text: '#7e22ce', icon: '🔮' };
+            case 'Perla': return { bg: '#fdf8f6', border: '#fed7aa', text: '#7c2d12', icon: '⚪' };
+            case 'Obsidiana': return { bg: '#f4f4f5', border: '#a1a1aa', text: '#09090b', icon: '🖤' };
+            case 'Diamante': return { bg: '#ecfeff', border: '#67e8f9', text: '#0e7490', icon: '💎' };
+            default: return { bg: '#f8fafc', border: '#e2e8f0', text: '#64748b', icon: '⭐' };
+        }
     };
 
     if (loading) {
@@ -495,8 +592,10 @@ const ClientRoutine = () => {
                                                                 <button
                                                                     onClick={() => {
                                                                         if (currentStep === totalGroups - 1) {
-                                                                            setOpenDay(null);
-                                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                            setRatingDayName(day.name);
+                                                                            setSelectedStars(0);
+                                                                            setHoveredStars(0);
+                                                                            setShowRatingModal(true);
                                                                         } else {
                                                                             setCurrentStep(prev => prev + 1);
                                                                         }
@@ -586,6 +685,50 @@ const ClientRoutine = () => {
                                 </div>
                             )}
 
+                            {/* Medals & Streaks Section */}
+                            <div style={{
+                                marginTop: '25px', padding: '20px', background: '#f8fafc',
+                                border: '1px solid #e2e8f0', borderRadius: '16px',
+                                display: 'flex', flexDirection: 'column', gap: '15px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ fontSize: '28px', display: 'inline-block', animation: streakData.streak > 0 ? 'pulse 1.5s infinite' : 'none' }}>🔥</span>
+                                        <div>
+                                            <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#64748b', fontWeight: 800, display: 'block', letterSpacing: '0.5px' }}>Racha Activa</span>
+                                            <span style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b' }}>
+                                                {streakData.streak} {streakData.streak === 1 ? 'Día' : 'Días'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    {streakData.badge !== 'Ninguna' && (
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            background: getMedalColor(streakData.badge).bg,
+                                            border: `1px solid ${getMedalColor(streakData.badge).border}`,
+                                            color: getMedalColor(streakData.badge).text,
+                                            padding: '8px 16px', borderRadius: '14px', fontWeight: 900, fontSize: '12px',
+                                            boxShadow: '0 4px 10px rgba(0,0,0,0.03)'
+                                        }}>
+                                            <span style={{ fontSize: '18px' }}>{getMedalColor(streakData.badge).icon}</span>
+                                            Medalla de {streakData.badge}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div style={{
+                                    fontSize: '12px', fontWeight: 700, color: streakData.streak === 0 ? '#92400e' : '#166534',
+                                    background: streakData.streak === 0 ? '#fffbeb' : '#f0fdf4',
+                                    border: streakData.streak === 0 ? '1px solid #fef3c7' : '1px solid #dcfce7',
+                                    borderRadius: '12px', padding: '12px 15px', display: 'flex', alignItems: 'flex-start', gap: '10px',
+                                    lineHeight: '1.4', textAlign: 'left'
+                                }}>
+                                    <span style={{ fontSize: '16px' }}>{streakData.streak === 0 ? '💡' : '🏆'}</span>
+                                    <span>{streakData.progress_message}</span>
+                                </div>
+                            </div>
+
                             <button
                                 onClick={() => setShowWeightHistory(true)}
                                 style={{
@@ -668,61 +811,375 @@ const ClientRoutine = () => {
             </div>
 
             {/* Weight History Modal (Needs to be here to be on top) */}
-            {showWeightHistory && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                    background: 'rgba(0,0,0,0.8)', zIndex: 2000,
-                    display: 'flex', justifyContent: 'center', alignItems: 'center',
-                    padding: '20px', backdropFilter: 'blur(5px)'
-                }}>
+            {showWeightHistory && (() => {
+                // Filter and group weight history
+                const processedData = (() => {
+                    if (weightFilter === 'month') {
+                        // Last 30 days
+                        const now = new Date();
+                        const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+                        const filtered = weightHistory.filter(item => {
+                            const parts = item.date.split('-');
+                            const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            return rDate >= cutoff;
+                        });
+                        const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
+                        return sorted.map(item => {
+                            const parts = item.date.split('-');
+                            const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            return {
+                                label: formatDateSpanish(rDate),
+                                weight: Number(item.weight),
+                                originalDate: item.date,
+                                notes: item.notes || 'Registro de peso'
+                            };
+                        });
+                    } else {
+                        // Last 365 days
+                        const now = new Date();
+                        const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 365);
+                        
+                        // Group by YYYY-MM
+                        const groups: { [key: string]: { weights: number[], monthIndex: number, year: number } } = {};
+                        weightHistory.forEach(item => {
+                            const parts = item.date.split('-');
+                            const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            if (rDate >= cutoff) {
+                                const yearMonth = `${parts[0]}-${parts[1]}`;
+                                if (!groups[yearMonth]) {
+                                    groups[yearMonth] = {
+                                        weights: [],
+                                        monthIndex: rDate.getMonth(),
+                                        year: rDate.getFullYear()
+                                    };
+                                }
+                                groups[yearMonth].weights.push(Number(item.weight));
+                            }
+                        });
+
+                        const sortedKeys = Object.keys(groups).sort();
+                        return sortedKeys.map(key => {
+                            const group = groups[key];
+                            const avgWeight = group.weights.reduce((sum, val) => sum + val, 0) / group.weights.length;
+                            return {
+                                label: MONTH_NAMES_SHORT[group.monthIndex],
+                                weight: Math.round(avgWeight * 10) / 10,
+                                originalDate: `${MONTH_NAMES_SHORT[group.monthIndex]} ${group.year}`,
+                                notes: `Promedio mensual (${group.weights.length} registros)`
+                            };
+                        });
+                    }
+                })();
+
+                const filteredHistoryForCards = weightHistory.filter(item => {
+                    const parts = item.date.split('-');
+                    const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    const now = new Date();
+                    const limitDays = weightFilter === 'month' ? 30 : 365;
+                    const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - limitDays);
+                    return rDate >= cutoff;
+                }).sort((a, b) => b.date.localeCompare(a.date));
+
+                // Chart parameters
+                const chartWidth = 550;
+                const chartHeight = 250;
+                const paddingTop = 25;
+                const paddingBottom = 40;
+                const paddingLeft = 45;
+                const paddingRight = 25;
+                const drawWidth = chartWidth - paddingLeft - paddingRight;
+                const drawHeight = chartHeight - paddingTop - paddingBottom;
+
+                const weights = processedData.map(d => d.weight);
+                const maxW = weights.length > 0 ? Math.max(...weights) : 80;
+                const minW = weights.length > 0 ? Math.min(...weights) : 60;
+                
+                const minY = Math.max(0, minW - 10);
+                const maxY = maxW === minW ? minW + 10 : maxW + 10;
+                
+                const getX = (index: number) => {
+                    if (processedData.length <= 1) return paddingLeft + drawWidth / 2;
+                    return paddingLeft + (index / (processedData.length - 1)) * drawWidth;
+                };
+
+                const getY = (weight: number) => {
+                    const denom = maxY - minY;
+                    if (denom === 0) return paddingTop + drawHeight / 2;
+                    return chartHeight - paddingBottom - ((weight - minY) / denom) * drawHeight;
+                };
+
+                let linePathStr = '';
+                let areaPathStr = '';
+                if (processedData.length > 1) {
+                    const pts = processedData.map((d, i) => ({ x: getX(i), y: getY(d.weight) }));
+                    linePathStr = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                    areaPathStr = `${linePathStr} L ${pts[pts.length - 1].x} ${chartHeight - paddingBottom} L ${pts[0].x} ${chartHeight - paddingBottom} Z`;
+                }
+                
+                const gridSteps = 3;
+                const gridLines = [];
+                for (let i = 0; i <= gridSteps; i++) {
+                    gridLines.push(minY + (i * (maxY - minY)) / gridSteps);
+                }
+
+                return (
                     <div style={{
-                        background: '#fff', width: '100%', maxWidth: '500px',
-                        borderRadius: '24px', overflow: 'hidden',
-                        animation: 'fadeIn 0.3s ease-out',
-                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+                        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                        background: 'rgba(0,0,0,0.8)', zIndex: 2000,
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        padding: '20px', backdropFilter: 'blur(5px)'
                     }}>
                         <div style={{
-                            background: '#111', color: '#a2d149', padding: '20px 25px',
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                            background: '#fff', width: '100%', maxWidth: '650px',
+                            borderRadius: '24px', overflow: 'hidden',
+                            animation: 'fadeIn 0.3s ease-out',
+                            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
                         }}>
-                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                Historial de Peso
-                            </h3>
-                            <button onClick={() => setShowWeightHistory(false)} style={{ background: 'transparent', border: 'none', color: '#a2d149', cursor: 'pointer' }}>
-                                <X size={24} />
-                            </button>
-                        </div>
+                            <div style={{
+                                background: '#111', color: '#a2d149', padding: '20px 25px',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                            }}>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                    Historial de Peso
+                                </h3>
+                                <button onClick={() => setShowWeightHistory(false)} style={{ background: 'transparent', border: 'none', color: '#a2d149', cursor: 'pointer' }}>
+                                    <X size={24} />
+                                </button>
+                            </div>
 
-                        <div style={{ padding: '25px', maxHeight: '70vh', overflowY: 'auto' }}>
-                            {weightHistory.length === 0 ? (
-                                <p style={{ textAlign: 'center', color: '#666', padding: '20px' }}>No hay registros históricos aún.</p>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    {weightHistory.map((item) => (
-                                        <div key={item.id} style={{
-                                            background: '#f8fafc', padding: '15px 20px', borderRadius: '16px',
-                                            borderLeft: '5px solid #a2d149', display: 'flex',
-                                            justifyContent: 'space-between', alignItems: 'center',
-                                            boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
-                                        }}>
-                                            <div>
-                                                <div style={{ fontSize: '10px', fontWeight: 800, color: '#a38210', textTransform: 'uppercase' }}>{item.date}</div>
-                                                <div style={{ fontSize: '14px', fontWeight: 600, color: '#444', marginTop: '4px' }}>{item.notes || 'Registro de peso'}</div>
-                                            </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <div style={{ fontSize: '24px', fontWeight: 900, color: '#111' }}>{item.weight}<span style={{ fontSize: '14px', marginLeft: '2px' }}>kg</span></div>
-                                            </div>
-                                        </div>
-                                    ))}
+                            <div style={{ padding: '25px', maxHeight: '70vh', overflowY: 'auto' }}>
+                                {/* Filter Toggle Tabs */}
+                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', gap: '10px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setWeightFilter('month')}
+                                        style={{
+                                            padding: '8px 20px',
+                                            borderRadius: '50px',
+                                            border: 'none',
+                                            fontWeight: 800,
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            background: weightFilter === 'month' ? '#a2d149' : '#f1f5f9',
+                                            color: weightFilter === 'month' ? '#fff' : '#64748b',
+                                            boxShadow: weightFilter === 'month' ? '0 4px 12px rgba(162, 209, 73, 0.25)' : 'none'
+                                        }}
+                                    >
+                                        Mes
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setWeightFilter('year')}
+                                        style={{
+                                            padding: '8px 20px',
+                                            borderRadius: '50px',
+                                            border: 'none',
+                                            fontWeight: 800,
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            background: weightFilter === 'year' ? '#a2d149' : '#f1f5f9',
+                                            color: weightFilter === 'year' ? '#fff' : '#64748b',
+                                            boxShadow: weightFilter === 'year' ? '0 4px 12px rgba(162, 209, 73, 0.25)' : 'none'
+                                        }}
+                                    >
+                                        Año
+                                    </button>
                                 </div>
-                            )}
-                        </div>
-                        <div style={{ padding: '20px 25px', background: '#f1f5f9', textAlign: 'center' }}>
-                            <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Registrado automáticamente con cada actualización</p>
+
+                                {/* SVG Chart Area */}
+                                <div style={{ position: 'relative', width: '100%', background: '#fafafa', borderRadius: '16px', padding: '10px', border: '1px solid #e2e8f0', marginBottom: '25px' }}>
+                                    {processedData.length === 0 ? (
+                                        <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 600 }}>
+                                            No hay registros de peso en los últimos {weightFilter === 'month' ? '30 días' : '365 días'}.
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} width="100%" height="auto" style={{ overflow: 'visible' }}>
+                                                <defs>
+                                                    <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="0%" stopColor="#a2d149" stopOpacity="0.4" />
+                                                        <stop offset="100%" stopColor="#a2d149" stopOpacity="0.0" />
+                                                    </linearGradient>
+                                                </defs>
+
+                                                {/* Grid Lines */}
+                                                {gridLines.map((val, idx) => {
+                                                    const y = getY(val);
+                                                    return (
+                                                        <g key={idx}>
+                                                            <line
+                                                                x1={paddingLeft}
+                                                                y1={y}
+                                                                x2={chartWidth - paddingRight}
+                                                                y2={y}
+                                                                stroke="#e2e8f0"
+                                                                strokeDasharray="4 4"
+                                                            />
+                                                            <text
+                                                                x={paddingLeft - 8}
+                                                                y={y}
+                                                                textAnchor="end"
+                                                                dominantBaseline="middle"
+                                                                fill="#64748b"
+                                                                fontSize="10"
+                                                                fontWeight="700"
+                                                            >
+                                                                {Math.round(val)} kg
+                                                            </text>
+                                                        </g>
+                                                    );
+                                                })}
+
+                                                {/* Area under the line */}
+                                                {areaPathStr && (
+                                                    <path d={areaPathStr} fill="url(#weightGrad)" />
+                                                )}
+
+                                                {/* Stroke Line */}
+                                                {linePathStr && (
+                                                    <path
+                                                        d={linePathStr}
+                                                        fill="none"
+                                                        stroke="#a2d149"
+                                                        strokeWidth="3"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    />
+                                                )}
+
+                                                {/* Labels on X-axis */}
+                                                {processedData.map((d, idx) => {
+                                                    const x = getX(idx);
+                                                    const totalLabels = processedData.length;
+                                                    const showLabel = 
+                                                        weightFilter === 'year' || 
+                                                        totalLabels <= 8 || 
+                                                        idx === 0 || 
+                                                        idx === totalLabels - 1 || 
+                                                        idx % Math.ceil(totalLabels / 6) === 0;
+
+                                                    if (!showLabel) return null;
+
+                                                    return (
+                                                        <g key={idx}>
+                                                            <text
+                                                                x={x}
+                                                                y={chartHeight - paddingBottom + 18}
+                                                                textAnchor="middle"
+                                                                fill="#64748b"
+                                                                fontSize="9"
+                                                                fontWeight="800"
+                                                            >
+                                                                {d.label}
+                                                            </text>
+                                                            <line
+                                                                x1={x}
+                                                                y1={chartHeight - paddingBottom}
+                                                                x2={x}
+                                                                y2={chartHeight - paddingBottom + 4}
+                                                                stroke="#cbd5e1"
+                                                            />
+                                                        </g>
+                                                    );
+                                                })}
+
+                                                {/* Circles on data points */}
+                                                {processedData.map((d, idx) => {
+                                                    const x = getX(idx);
+                                                    const y = getY(d.weight);
+                                                    const isHovered = hoveredPoint && hoveredPoint.index === idx;
+
+                                                    return (
+                                                        <circle
+                                                            key={idx}
+                                                            cx={x}
+                                                            cy={y}
+                                                            r={isHovered ? 7 : 4}
+                                                            fill={isHovered ? "#2d4739" : "#a2d149"}
+                                                            stroke="#fff"
+                                                            strokeWidth={isHovered ? 2.5 : 1.5}
+                                                            style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
+                                                            onMouseEnter={() => setHoveredPoint({ ...d, index: idx, x, y })}
+                                                            onMouseLeave={() => setHoveredPoint(null)}
+                                                        />
+                                                    );
+                                                })}
+                                            </svg>
+
+                                            {/* Floating Tooltip */}
+                                            {hoveredPoint && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    left: `${(hoveredPoint.x / chartWidth) * 100}%`,
+                                                    top: `${(hoveredPoint.y / chartHeight) * 100 - 30}px`,
+                                                    transform: 'translate(-50%, -100%)',
+                                                    background: '#111',
+                                                    color: '#fff',
+                                                    padding: '8px 12px',
+                                                    borderRadius: '10px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+                                                    pointerEvents: 'none',
+                                                    zIndex: 10,
+                                                    whiteSpace: 'nowrap',
+                                                    border: '1px solid #a2d149',
+                                                    textAlign: 'center',
+                                                    animation: 'fadeIn 0.15s ease-out'
+                                                }}>
+                                                    <div style={{ color: '#a2d149', fontSize: '13px', fontWeight: 900 }}>{hoveredPoint.weight} kg</div>
+                                                    <div style={{ fontSize: '9px', opacity: 0.8, marginTop: '2px' }}>{hoveredPoint.originalDate}</div>
+                                                    <div style={{ fontSize: '8px', opacity: 0.6, marginTop: '2px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{hoveredPoint.notes}</div>
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        bottom: '-5px',
+                                                        left: '50%',
+                                                        transform: 'translateX(-50%)',
+                                                        width: 0,
+                                                        height: 0,
+                                                        borderLeft: '5px solid transparent',
+                                                        borderRight: '5px solid transparent',
+                                                        borderTop: '5px solid #111'
+                                                    }} />
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* List of cards */}
+                                {filteredHistoryForCards.length === 0 ? (
+                                    <p style={{ textAlign: 'center', color: '#666', padding: '20px' }}>No hay registros en este período.</p>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {filteredHistoryForCards.map((item) => (
+                                            <div key={item.id} style={{
+                                                background: '#f8fafc', padding: '8px 15px', borderRadius: '12px',
+                                                borderLeft: '4px solid #a2d149', display: 'flex',
+                                                justifyContent: 'space-between', alignItems: 'center',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontSize: '9px', fontWeight: 800, color: '#a38210', textTransform: 'uppercase' }}>{item.date}</div>
+                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#444', marginTop: '2px' }}>{item.notes || 'Registro de peso'}</div>
+                                                </div>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <div style={{ fontSize: '18px', fontWeight: 900, color: '#111' }}>{item.weight}<span style={{ fontSize: '11px', marginLeft: '2px', fontWeight: 800 }}>kg</span></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ padding: '20px 25px', background: '#f1f5f9', textAlign: 'center' }}>
+                                <p style={{ margin: 0, fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Registrado automáticamente con cada actualización</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Footers Container */}
             <div style={{
@@ -863,6 +1320,11 @@ const ClientRoutine = () => {
                     from { opacity: 0; transform: translateX(20px); }
                     to { opacity: 1; transform: translateX(0); }
                 }
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.15); }
+                    100% { transform: scale(1); }
+                }
                 @media (max-width: 600px) {
                     .notif-container {
                         position: fixed !important;
@@ -880,6 +1342,102 @@ const ClientRoutine = () => {
                     }
                 }
             `}</style>
+
+            {showRatingModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 2000, animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <div style={{
+                        background: '#fff', width: '90%', maxWidth: '400px',
+                        borderRadius: '24px', padding: '30px 20px', textAlign: 'center',
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative'
+                    }}>
+                        {!ratingSuccess ? (
+                            <>
+                                <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#2d4739', margin: '0 0 10px 0' }}>
+                                    ¡ENTRENAMIENTO COMPLETADO! 🎉
+                                </h3>
+                                <p style={{ fontSize: '13px', color: '#64748b', fontWeight: 500, margin: '0 0 25px 0' }}>
+                                    Puntúa la rutina de hoy para activar tu racha y guardar tu progreso.
+                                </p>
+                                
+                                <p style={{ fontSize: '14px', fontWeight: 700, color: '#334155', margin: '0 0 15px 0' }}>
+                                    ¿Cuántas estrellas le das a la rutina?
+                                </p>
+                                
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '30px' }}>
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setSelectedStars(star)}
+                                            onMouseEnter={() => setHoveredStars(star)}
+                                            onMouseLeave={() => setHoveredStars(0)}
+                                            style={{
+                                                background: 'transparent', border: 'none', cursor: 'pointer',
+                                                fontSize: '36px', color: (hoveredStars || selectedStars) >= star ? '#facc15' : '#e2e8f0',
+                                                transition: 'transform 0.1s, color 0.1s',
+                                                transform: (hoveredStars || selectedStars) >= star ? 'scale(1.15)' : 'scale(1)'
+                                            }}
+                                        >
+                                            ★
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <button
+                                        type="button"
+                                        disabled={submittingRating}
+                                        onClick={() => setShowRatingModal(false)}
+                                        style={{
+                                            flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569',
+                                            border: 'none', borderRadius: '12px', fontWeight: 700, fontSize: '13px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={selectedStars === 0 || submittingRating}
+                                        onClick={handleCompleteWorkout}
+                                        style={{
+                                            flex: 2, padding: '12px',
+                                            background: selectedStars === 0 ? '#cbd5e1' : '#a2d149',
+                                            color: '#fff', border: 'none', borderRadius: '12px',
+                                            fontWeight: 800, fontSize: '13px',
+                                            cursor: selectedStars === 0 ? 'not-allowed' : 'pointer',
+                                            boxShadow: selectedStars === 0 ? 'none' : '0 8px 16px rgba(162, 209, 73, 0.25)',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {submittingRating ? 'Guardando...' : 'Enviar Calificación'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ padding: '20px 0' }}>
+                                <div style={{
+                                    fontSize: '60px', color: '#10b981', marginBottom: '20px',
+                                    animation: 'scaleIn 0.3s ease-out'
+                                }}>
+                                    ✓
+                                </div>
+                                <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#10b981', margin: '0 0 10px 0' }}>
+                                    ¡Excelente Trabajo!
+                                </h3>
+                                <p style={{ fontSize: '14px', color: '#64748b', fontWeight: 600, margin: 0 }}>
+                                    Tu racha ha sido actualizada. ¡A seguir con toda! 🔥
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <InfoModal isOpen={isInfoModalOpen} onClose={() => setIsInfoModalOpen(false)} />
         </div>

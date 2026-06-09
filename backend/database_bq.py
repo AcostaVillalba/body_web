@@ -336,6 +336,22 @@ class BigQueryDB:
         self.query(sql, params)
         return True
 
+    def log_completed_workout(self, user_id, day_name, stars):
+        new_id = int(time.time() * 1000) % 2147483647
+        row = {
+            "id": new_id,
+            "user_id": user_id,
+            "completed_at": now_bogota().isoformat(),
+            "day_name": day_name,
+            "stars": stars
+        }
+        return self.insert("workout_logs", row)
+
+    def get_completed_workouts(self, user_id):
+        sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.workout_logs` WHERE user_id = @user_id ORDER BY completed_at DESC"
+        params = [bigquery.ScalarQueryParameter("user_id", "INTEGER", user_id)]
+        return self.query(sql, params)
+
 # Inicialización diferida
 _bq_db = None
 

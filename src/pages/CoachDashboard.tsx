@@ -50,6 +50,7 @@ interface AthleteData {
   profile: AthleteProfile;
   is_active?: boolean;
   coach_id?: number | null;
+  avg_rating?: number | null;
 }
 
 export interface CoachDashboardProps {
@@ -59,6 +60,248 @@ export interface CoachDashboardProps {
   onCancel?: () => void;
   isReadOnly?: boolean;
 }
+
+interface TemplateExercise {
+  name: string;
+  series: string;
+  reps: string;
+  isCardio: boolean;
+  note?: string;
+}
+
+const TEMPLATES_DATA: Record<string, {
+  name: string;
+  description: string;
+  days: {
+    name: string;
+    exercises: TemplateExercise[];
+  }[];
+}> = {
+  perdida_peso: {
+    name: "Pérdida de Peso",
+    description: "Enfocada en volumen moderado/alto, ejercicios multiarticulares y acondicionamiento cardiovascular.",
+    days: [
+      {
+        name: "Lunes",
+        exercises: [
+          { name: "Press de banca con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Jalón abierto en pronacion", series: "4", reps: "10", isCardio: false },
+          { name: "Press militar con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Curl alterno con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de triceps en maquina", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Martes",
+        exercises: [
+          { name: "Sentadilla goblet", series: "4", reps: "10", isCardio: false },
+          { name: "Peso muerto con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Zancada trasera", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Aductor en maquina", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Miércoles",
+        exercises: [
+          { name: "Press banca inclinado con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Remo con mancuerna aislado", series: "4", reps: "10", isCardio: false },
+          { name: "Vuelos laterales", series: "4", reps: "10", isCardio: false },
+          { name: "Curl con barra EZ", series: "4", reps: "10", isCardio: false },
+          { name: "Fondos en banco plano", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Jueves",
+        exercises: [
+          { name: "Extensión de cuadriceps", series: "4", reps: "10", isCardio: false },
+          { name: "Curl femoral horizontal", series: "4", reps: "10", isCardio: false },
+          { name: "Hip thrusts con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos de pie sin peso", series: "4", reps: "10", isCardio: false },
+          { name: "Zancada estática", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Viernes",
+        exercises: [
+          { name: "Caminadora", series: "30", reps: "MIN", isCardio: true },
+          { name: "Plancha", series: "4", reps: "10", isCardio: false, note: "Sostener plancha activa durante 45-60 segundos" },
+          { name: "Elíptica", series: "30", reps: "MIN", isCardio: true },
+          { name: "Crunch", series: "4", reps: "10", isCardio: false },
+          { name: "Giros rusos", series: "4", reps: "10", isCardio: false }
+        ]
+      }
+    ]
+  },
+  principiantes: {
+    name: "Principiantes",
+    description: "Ejercicios guiados en máquinas y variantes de peso libre de baja complejidad y menor riesgo de lesión.",
+    days: [
+      {
+        name: "Lunes",
+        exercises: [
+          { name: "Press de banca en máquina sentado", series: "4", reps: "10", isCardio: false },
+          { name: "Jalón en maquina en pronacion", series: "4", reps: "10", isCardio: false },
+          { name: "Press militar en maquina", series: "4", reps: "10", isCardio: false },
+          { name: "Curl en maquina en supinacion", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de triceps en maquina", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Martes",
+        exercises: [
+          { name: "Prensa inclinada cerrada", series: "4", reps: "10", isCardio: false },
+          { name: "Curl femoral horizontal", series: "4", reps: "10", isCardio: false },
+          { name: "Abducción en máquina", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos de pie sin peso", series: "4", reps: "10", isCardio: false },
+          { name: "Sentadilla goblet", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Miércoles",
+        exercises: [
+          { name: "Press de banca con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Remo en máquina neutro", series: "4", reps: "10", isCardio: false },
+          { name: "Elevaciones laterales en máquina", series: "4", reps: "10", isCardio: false },
+          { name: "Curl alterno con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Fondos en banco plano", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Jueves",
+        exercises: [
+          { name: "Sentadilla en banco", series: "4", reps: "10", isCardio: false },
+          { name: "Peso muerto con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Hip thrusts aislado", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Prensa horizontal", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Viernes",
+        exercises: [
+          { name: "Caminadora", series: "30", reps: "MIN", isCardio: true },
+          { name: "Crunch", series: "4", reps: "10", isCardio: false },
+          { name: "Bicicleta estática", series: "30", reps: "MIN", isCardio: true },
+          { name: "Plancha", series: "4", reps: "10", isCardio: false, note: "Mantener postura recta y core activo" },
+          { name: "Giros rusos", series: "4", reps: "10", isCardio: false }
+        ]
+      }
+    ]
+  },
+  musculatura: {
+    name: "Musculatura",
+    description: "Centrada en movimientos compuestos pesados de hipertrofia y desarrollo muscular.",
+    days: [
+      {
+        name: "Lunes",
+        exercises: [
+          { name: "Press de banca con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Remo con barra en supinacion", series: "4", reps: "10", isCardio: false },
+          { name: "Press militar con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Curl con barra EZ", series: "4", reps: "10", isCardio: false },
+          { name: "Press cerrado con barra", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Martes",
+        exercises: [
+          { name: "Sentadilla libre con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Peso muerto rumano con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Sentadilla búlgara con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos en prensa", series: "4", reps: "10", isCardio: false },
+          { name: "Aductor en maquina", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Miércoles",
+        exercises: [
+          { name: "Press banca inclinado con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Jalón cerrado en supinacion", series: "4", reps: "10", isCardio: false },
+          { name: "Elevaciones laterales en máquina", series: "4", reps: "10", isCardio: false },
+          { name: "Curl inclinado con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Fondos en paralelas", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Jueves",
+        exercises: [
+          { name: "Prensa horizontal", series: "4", reps: "10", isCardio: false },
+          { name: "Curl femoral vertical", series: "4", reps: "10", isCardio: false },
+          { name: "Hip thrusts con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos de pie sin peso", series: "4", reps: "10", isCardio: false },
+          { name: "Sentadilla en Hack", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Viernes",
+        exercises: [
+          { name: "Escaladora", series: "30", reps: "MIN", isCardio: true },
+          { name: "Rueda abdominal", series: "4", reps: "10", isCardio: false },
+          { name: "Elevaciones de piernas colgado", series: "4", reps: "10", isCardio: false },
+          { name: "Caminadora", series: "30", reps: "MIN", isCardio: true },
+          { name: "Plancha", series: "4", reps: "10", isCardio: false }
+        ]
+      }
+    ]
+  },
+  recomposicion: {
+    name: "Recomposición",
+    description: "Plan equilibrado de fuerza/hipertrofia y acondicionamiento metabólico constante.",
+    days: [
+      {
+        name: "Lunes",
+        exercises: [
+          { name: "Press de banca con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Remo en barra T en supinacion", series: "4", reps: "10", isCardio: false },
+          { name: "Press Arnold con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Curl concentrado con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Copa aislada con mancuerna", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Martes",
+        exercises: [
+          { name: "Sentadilla en Hack", series: "4", reps: "10", isCardio: false },
+          { name: "Peso muerto rumano con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Zancada trasera", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos en máquina Smit", series: "4", reps: "10", isCardio: false },
+          { name: "Sentadilla goblet", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Miércoles",
+        exercises: [
+          { name: "Aperturas con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Jalón abierto en pronacion", series: "4", reps: "10", isCardio: false },
+          { name: "Vuelos laterales", series: "4", reps: "10", isCardio: false },
+          { name: "Curl alterno de martillo con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Press frances con barra", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Jueves",
+        exercises: [
+          { name: "Sentadilla búlgara con mancuernas", series: "4", reps: "10", isCardio: false },
+          { name: "Curl femoral horizontal", series: "4", reps: "10", isCardio: false },
+          { name: "Hip thrusts con barra", series: "4", reps: "10", isCardio: false },
+          { name: "Extension de gemelos con mancuerna", series: "4", reps: "10", isCardio: false },
+          { name: "Aductor en maquina", series: "4", reps: "10", isCardio: false }
+        ]
+      },
+      {
+        name: "Viernes",
+        exercises: [
+          { name: "Bicicleta de aire", series: "30", reps: "MIN", isCardio: true },
+          { name: "Giros rusos", series: "4", reps: "10", isCardio: false },
+          { name: "Caminadora", series: "30", reps: "MIN", isCardio: true },
+          { name: "Plancha", series: "4", reps: "10", isCardio: false },
+          { name: "Rueda abdominal", series: "4", reps: "10", isCardio: false }
+        ]
+      }
+    ]
+  }
+};
 
 export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideHeader, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) {
   const { token, logout, user, setIsLoading } = useAuth();
@@ -88,12 +331,19 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'none'>('none');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
+  // Weight History States
+  const [weightHistory, setWeightHistory] = useState<any[]>([]);
+  const [weightFilter, setWeightFilter] = useState<'month' | 'year'>('month');
+  const [hoveredPoint, setHoveredPoint] = useState<any>(null);
+  const [showWeightProgress, setShowWeightProgress] = useState(false);
+
   // Bloqueo de Coach Inactivo
   const isCoachBlocked = user?.role === 'Coach' && !user.isActive;
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [dayRatings, setDayRatings] = useState<Record<string, number>>({});
 
   // Auth Headers Helper
   const authHeaders = useMemo(() => ({
@@ -307,6 +557,14 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
   const [athlete, setAthlete] = useState<AthleteData>(emptyAthlete);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [routineDays, setRoutineDays] = useState<RoutineDay[]>([]);
+  const [isTemplatesExpanded, setIsTemplatesExpanded] = useState(false);
+  const [activeBlockIndices, setActiveBlockIndices] = useState<Record<string, number>>({});
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
+  const [isModifyingRoutine, setIsModifyingRoutine] = useState(false);
+  const [showAthleteDetails, setShowAthleteDetails] = useState(false);
+  const [backupRoutineDays, setBackupRoutineDays] = useState<RoutineDay[]>([]);
+  const [backupSelectedDays, setBackupSelectedDays] = useState<string[]>([]);
+  const [backupWeight, setBackupWeight] = useState<string>('');
   const [isLoadingLocal, setIsLoadingLocal] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
   const [isRenewalActive, setIsRenewalActive] = useState(false);
@@ -535,15 +793,32 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     if (activeTab === 'profile') fetchCoachProfile();
   }, [activeTab]);
 
-  const handleClientSelect = (email: string) => {
+  const handleClientSelect = async (email: string) => {
     setIsRenewalActive(false);
+    setActiveBlockIndices({});
+    setExpandedDays({});
+    setIsModifyingRoutine(false);
+    setShowAthleteDetails(false);
     if (!email) {
       setAthlete({ ...emptyAthlete, id: undefined });
+      setWeightHistory([]);
       return;
     }
     const selected = clients.find(c => c.email === email);
     if (selected) {
       setAthlete(selected);
+      try {
+        const wRes = await fetch(`${API_URL}/api/coach/client/weight-history/${email}`, { headers: authHeaders });
+        if (wRes.ok) {
+          const wData = await wRes.json();
+          setWeightHistory(wData);
+        } else {
+          setWeightHistory([]);
+        }
+      } catch (err) {
+        console.error("Error loading client weight history", err);
+        setWeightHistory([]);
+      }
     }
   };
 
@@ -559,6 +834,10 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
   const handleViewRoutineFromList = async (clientEmail: string) => {
     setIsLoadingLocal(true);
     setIsReadOnly(true);
+    setActiveBlockIndices({});
+    setExpandedDays({});
+    setIsModifyingRoutine(false);
+    setShowAthleteDetails(false);
     try {
       const res = await fetch(`${API_URL}/api/coach/routine/${clientEmail}`, { headers: authHeaders });
       if (res.ok) {
@@ -580,16 +859,33 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
 
           setRoutineDays(updatedRoutine);
           setSelectedDays(updatedRoutine.map((d: any) => d.name));
+          setDayRatings(data.ratings_by_day || {});
         } else {
           setRoutineDays([]);
           setSelectedDays([]);
+          setDayRatings({});
         }
 
         const client = clients.find(c => c.email === clientEmail);
         if (client) setAthlete(client);
       }
+
+      // Fetch client weight history
+      try {
+        const wRes = await fetch(`${API_URL}/api/coach/client/weight-history/${clientEmail}`, { headers: authHeaders });
+        if (wRes.ok) {
+          const wData = await wRes.json();
+          setWeightHistory(wData);
+        } else {
+          setWeightHistory([]);
+        }
+      } catch (err) {
+        console.error("Error loading client weight history", err);
+        setWeightHistory([]);
+      }
     } catch (e) {
       console.error("Error loading routine", e);
+      setDayRatings({});
     } finally {
       setIsLoadingLocal(false);
       setActiveTab('create'); // Reutilizamos la vista de creación pero en modo lectura
@@ -602,6 +898,15 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     setAthlete(emptyAthlete);
     setRoutineDays([]);
     setSelectedDays([]);
+    setDayRatings({});
+    setWeightHistory([]);
+    setWeightFilter('month');
+    setHoveredPoint(null);
+    setShowWeightProgress(false);
+    setActiveBlockIndices({});
+    setExpandedDays({});
+    setIsModifyingRoutine(false);
+    setShowAthleteDetails(false);
   };
 
   const handleAcceptRenewal = async () => {
@@ -668,6 +973,32 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     );
   };
 
+  const toggleDayExpanded = (dayName: string) => {
+    setExpandedDays(prev => ({ ...prev, [dayName]: !prev[dayName] }));
+  };
+
+  const startModifyingRoutine = () => {
+    setBackupRoutineDays(JSON.parse(JSON.stringify(routineDays)));
+    setBackupSelectedDays([...selectedDays]);
+    setBackupWeight(athlete.profile.weight || '');
+    setIsModifyingRoutine(true);
+    setStatusMsg({ type: '', text: '' });
+  };
+
+  const cancelModifyingRoutine = () => {
+    setRoutineDays(backupRoutineDays);
+    setSelectedDays(backupSelectedDays);
+    setAthlete(prev => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        weight: backupWeight
+      }
+    }));
+    setIsModifyingRoutine(false);
+    setStatusMsg({ type: '', text: '' });
+  };
+
   const renderDays = () => {
     const newRoutineDays = selectedDays.map(dayName => {
       const existing = routineDays.find(d => d.name === dayName);
@@ -678,9 +1009,11 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
   };
 
   const addGroup = (dayName: string) => {
+    let newIndex = 0;
     setRoutineDays(prev =>
       prev.map(day => {
         if (day.name !== dayName) return day;
+        newIndex = day.groups.length;
         return {
           ...day,
           groups: [...day.groups, {
@@ -690,18 +1023,24 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
         };
       })
     );
+    setActiveBlockIndices(prev => ({ ...prev, [dayName]: newIndex }));
   };
 
   const removeGroup = (dayName: string, groupId: string) => {
+    let newIndex = 0;
     setRoutineDays(prev =>
       prev.map(day => {
         if (day.name !== dayName) return day;
+        const filtered = day.groups.filter(g => g.id !== groupId);
+        const currentIdx = activeBlockIndices[dayName] || 0;
+        newIndex = currentIdx >= filtered.length ? Math.max(0, filtered.length - 1) : currentIdx;
         return {
           ...day,
-          groups: day.groups.filter(g => g.id !== groupId)
+          groups: filtered
         };
       })
     );
+    setActiveBlockIndices(prev => ({ ...prev, [dayName]: newIndex }));
   };
 
   const createEmptyExercise = (): ExerciseSubRow => ({
@@ -713,6 +1052,56 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     img: '',
     isCardio: false
   });
+
+  const applyTemplate = (templateKey: string) => {
+    const template = TEMPLATES_DATA[templateKey];
+    if (!template) return;
+
+    if (routineDays.length > 0) {
+      const confirmOverwrite = window.confirm(
+        "¿Estás seguro de que deseas cargar esta plantilla? Se sobrescribirá la rutina actual que tienes en edición."
+      );
+      if (!confirmOverwrite) return;
+    }
+
+    const templateDays = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+    setSelectedDays(templateDays);
+
+    const populatedDays: RoutineDay[] = template.days.map((d, dayIdx) => {
+      return {
+        name: d.name,
+        groups: d.exercises.map((ex, exIdx) => ({
+          id: Date.now().toString() + "-" + Math.random().toString() + "-g-" + dayIdx + "-" + exIdx,
+          exercises: [{
+            id: Date.now().toString() + "-" + Math.random().toString() + "-ex-" + dayIdx + "-" + exIdx,
+            name: ex.name,
+            series: ex.series,
+            reps: ex.reps,
+            isCardio: ex.isCardio,
+            note: ex.note || '',
+            img: getImageUrl(ex.name)
+          }]
+        }))
+      };
+    });
+
+    setRoutineDays(populatedDays);
+
+    const indices: Record<string, number> = {};
+    templateDays.forEach(dayName => {
+      indices[dayName] = 0;
+    });
+    setActiveBlockIndices(indices);
+
+    const expanded: Record<string, boolean> = {};
+    templateDays.forEach(dayName => {
+      expanded[dayName] = true;
+    });
+    setExpandedDays(expanded);
+
+    setStatusMsg({ type: 'success', text: `¡Plantilla "${template.name}" cargada correctamente! Recuerda que puedes modificarla a tu conveniencia.` });
+    setIsTemplatesExpanded(false);
+  };
 
   const addBiserie = (dayName: string, groupId: string) => {
     setRoutineDays(prev =>
@@ -788,7 +1177,7 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
-          athlete: { ...athlete, is_active: shouldBeActive, isRenewal: isRenewalActive },
+          athlete: { ...athlete, is_active: shouldBeActive, isRenewal: isReadOnly ? false : isRenewalActive },
           routine_data: JSON.stringify(routineDays)
         })
       });
@@ -801,15 +1190,29 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
         }
       }
 
-      if (!res.ok) throw new Error("Error publicando la rutina");
+      if (!res.ok) throw new Error(isReadOnly ? "Error actualizando la rutina" : "Error publicando la rutina");
 
-      setStatusMsg({ type: 'success', text: '¡Rutina publicada y respaldada exitosamente!' });
+      setStatusMsg({ type: 'success', text: isReadOnly ? '¡Rutina actualizada exitosamente!' : '¡Rutina publicada y respaldada exitosamente!' });
       setIsRenewalActive(false);
+      setIsModifyingRoutine(false);
       fetchClients();
 
-      // Clear only routine while keeping athlete and message
-      setRoutineDays([]);
-      setSelectedDays([]);
+      if (isReadOnly) {
+        // Refrescar el historial de peso del atleta para reflejar el cambio en la gráfica
+        try {
+          const wRes = await fetch(`${API_URL}/api/coach/client/weight-history/${athlete.email}`, { headers: authHeaders });
+          if (wRes.ok) {
+            const wData = await wRes.json();
+            setWeightHistory(wData);
+          }
+        } catch (wErr) {
+          console.error("Error al refrescar el historial de peso", wErr);
+        }
+      } else {
+        // Clear only routine while keeping athlete and message
+        setRoutineDays([]);
+        setSelectedDays([]);
+      }
     } catch (err: any) {
       setStatusMsg({ type: 'error', text: err.message || 'Error desconocido' });
     } finally {
@@ -1121,7 +1524,10 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
 
           {activeTab === 'payments' ? (
             <div style={{ padding: '0 0 20px 0' }}>
-              <h2 className="section-title">Control de Pago a Body Logic</h2>
+              <h2 className="section-title" style={{ marginBottom: '4px' }}>Control de Pago a Body Logic</h2>
+              <p style={{ margin: '0 0 20px 0', fontSize: 'clamp(11px, 2vw, 13px)', color: '#64748b', fontWeight: 500, lineHeight: '1.4' }}>
+                Administra los saldos pendientes de tus asesorías y mantén un control preciso de los montos a liquidar con Body Logic.
+              </p>
 
               {/* Wompi Hidden Iframe / Widget Container */}
               <div id="wompi-widget-container" style={{ display: 'none' }}></div>
@@ -1502,32 +1908,37 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
           ) : activeTab === 'users' ? (
             <div style={{ padding: '0 0 20px 0' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '25px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <h2 className="section-title" style={{ margin: 0 }}>Listado de Atletas</h2>
-                  {(planFilter !== 'all' || statusFilter !== 'all' || sortOrder !== 'none' || searchQuery !== '') && (
-                    <button
-                      onClick={() => { setPlanFilter('all'); setStatusFilter('all'); setSortOrder('none'); setSearchQuery(''); }}
-                      style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
-                    >
-                      <RotateCcw size={12} /> Limpiar Filtros
-                    </button>
-                  )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <h2 className="section-title" style={{ margin: 0, fontSize: '0.95rem', letterSpacing: '0.5px' }}>Listado de Atletas</h2>
+                    {(planFilter !== 'all' || statusFilter !== 'all' || sortOrder !== 'none' || searchQuery !== '') && (
+                      <button
+                        onClick={() => { setPlanFilter('all'); setStatusFilter('all'); setSortOrder('none'); setSearchQuery(''); }}
+                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <RotateCcw size={10} /> Limpiar Filtros
+                      </button>
+                    )}
+                  </div>
+                  <p style={{ margin: 0, fontSize: 'clamp(11px, 2vw, 13px)', color: '#64748b', fontWeight: 500, lineHeight: '1.4' }}>
+                    Gestiona tu comunidad de atletas de forma integral: supervisa y edita sus rutinas activas, analiza el historial de progreso y revisa las valoraciones que otorgan a sus entrenamientos.
+                  </p>
                 </div>
 
                 <div className="search-filters-row" style={{ position: 'relative', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {/* Buscador Full Width */}
                   <div style={{
                     display: 'flex', alignItems: 'center', background: '#fff',
-                    padding: '8px 14px', borderRadius: 10, border: '2px solid #e2e8f0',
-                    flex: '1 1 220px', boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
+                    padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1',
+                    flex: '1 1 180px', maxWidth: '240px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                   }}>
-                    <Search size={16} color="#64748b" style={{ marginRight: 8 }} />
+                    <Search size={12} color="#64748b" style={{ marginRight: 4 }} />
                     <input
                       type="text"
                       placeholder="Buscar por nombre o email..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '15px', fontWeight: 500 }}
+                      style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '11px', fontWeight: 500 }}
                     />
                   </div>
 
@@ -1536,14 +1947,14 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                     <button
                       onClick={() => setIsFiltersOpen(!isFiltersOpen)}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 8, background: isFiltersOpen ? '#2d4739' : '#fff',
-                        color: isFiltersOpen ? '#fff' : '#475569', padding: '12px 20px', borderRadius: 12,
-                        border: '2px solid', borderColor: isFiltersOpen ? '#2d4739' : '#e2e8f0',
-                        fontSize: '14px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
+                        display: 'flex', alignItems: 'center', gap: 4, background: isFiltersOpen ? '#2d4739' : '#fff',
+                        color: isFiltersOpen ? '#fff' : '#475569', padding: '4px 8px', borderRadius: 6,
+                        border: '1px solid', borderColor: isFiltersOpen ? '#2d4739' : '#cbd5e1',
+                        fontSize: '11px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s'
                       }}>
-                      <Filter size={16} />
+                      <Filter size={12} />
                       <span>Filtros</span>
-                      {isFiltersOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      {isFiltersOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                     </button>
 
                     {/* Dropdown Menu */}
@@ -1555,17 +1966,17 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                           style={{ display: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1999, backdropFilter: 'blur(2px)' }}
                         />
                         <div className="filters-dropdown" style={{
-                          position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '280px',
-                          background: '#fff', borderRadius: 16, boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-                          padding: '20px', zIndex: 2000, border: '1px solid #e2e8f0',
-                          display: 'flex', flexDirection: 'column', gap: '15px', animation: 'fadeIn 0.2s ease-out'
+                          position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: '220px',
+                          background: '#fff', borderRadius: 12, boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+                          padding: '12px', zIndex: 2000, border: '1px solid #e2e8f0',
+                          display: 'flex', flexDirection: 'column', gap: '10px', animation: 'fadeIn 0.2s ease-out'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <label style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Plan de Suscripción</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <label style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Plan de Suscripción</label>
                             <select
                               value={planFilter}
                               onChange={(e) => setPlanFilter(e.target.value)}
-                              style={{ width: '100%', padding: '10px', borderRadius: 10, border: '2px solid #f1f5f9', outline: 'none', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1.5px solid #cbd5e1', outline: 'none', fontSize: '11px', fontWeight: 600, color: '#1e293b' }}
                             >
                               <option value="all">Todos los Planes</option>
                               <option value="Mensual">Mensual</option>
@@ -1574,12 +1985,12 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                             </select>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <label style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Estado del Atleta</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <label style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Estado del Atleta</label>
                             <select
                               value={statusFilter}
                               onChange={(e) => setStatusFilter(e.target.value)}
-                              style={{ width: '100%', padding: '10px', borderRadius: 10, border: '2px solid #f1f5f9', outline: 'none', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1.5px solid #cbd5e1', outline: 'none', fontSize: '11px', fontWeight: 600, color: '#1e293b' }}
                             >
                               <option value="all">Todos los Estados</option>
                               <option value="active">Activos</option>
@@ -1587,12 +1998,12 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                             </select>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <label style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Ordenar por Vencimiento</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <label style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Ordenar por Vencimiento</label>
                             <select
                               value={sortOrder}
                               onChange={(e) => setSortOrder(e.target.value as any)}
-                              style={{ width: '100%', padding: '10px', borderRadius: 10, border: '2px solid #f1f5f9', outline: 'none', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1.5px solid #cbd5e1', outline: 'none', fontSize: '11px', fontWeight: 600, color: '#1e293b' }}
                             >
                               <option value="none">Sin Ordenar</option>
                               <option value="asc">Más Próximo Primero</option>
@@ -1607,45 +2018,55 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
               </div>
 
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '11px' }}>
                   <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>Nombre</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>Email</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>Plan</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>Fin del Plan</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800 }}>Estado</th>
-                      <th style={{ padding: '16px 20px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', color: '#475569', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '6px 10px', fontWeight: 800 }}>Nombre</th>
+                      <th style={{ padding: '6px 10px', fontWeight: 800 }}>Email</th>
+                      <th style={{ padding: '6px 10px', fontWeight: 800 }}>Plan</th>
+                      <th style={{ padding: '6px 10px', fontWeight: 800 }}>Fin del Plan</th>
+                      <th style={{ padding: '6px 10px', fontWeight: 800 }}>Estado</th>
+                      <th style={{ padding: '6px 10px', fontWeight: 800 }}>Calificación de Rutina</th>
+                      <th style={{ padding: '6px 10px', fontWeight: 800, textAlign: 'right' }}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredClients.map(c => (
                       <tr key={c.email} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '15px 20px', fontWeight: 700 }}>{c.name}</td>
-                        <td style={{ padding: '15px 20px', color: '#64748b', fontSize: '13px' }}>{c.email}</td>
-                        <td style={{ padding: '15px 20px' }}>
-                          <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: 20, fontSize: '10px', fontWeight: 800 }}>
+                        <td style={{ padding: '6px 10px', fontWeight: 700, fontSize: '11.5px' }}>{c.name}</td>
+                        <td style={{ padding: '6px 10px', color: '#64748b', fontSize: '10.5px' }}>{c.email}</td>
+                        <td style={{ padding: '6px 10px' }}>
+                          <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 5px', borderRadius: 10, fontSize: '8px', fontWeight: 800 }}>
                             {c.profile?.planType || 'Mensual'}
                           </span>
                         </td>
-                        <td style={{ padding: '15px 20px', fontSize: '13px', fontWeight: 600 }}>{c.profile?.endDate || '—'}</td>
-                        <td style={{ padding: '15px 20px' }}>
+                        <td style={{ padding: '6px 10px', fontSize: '10.5px', fontWeight: 600 }}>{c.profile?.endDate || '—'}</td>
+                        <td style={{ padding: '6px 10px' }}>
                           <span style={{
-                            padding: '4px 10px', borderRadius: 20, fontSize: '10px', fontWeight: 800,
+                            padding: '2px 5px', borderRadius: 10, fontSize: '8px', fontWeight: 800,
                             background: c.is_active ? '#dcfce7' : '#fee2e2',
                             color: c.is_active ? '#166534' : '#991b1b'
                           }}>
                             {c.is_active ? '✅ ACTIVO' : '❌ INACTIVO'}
                           </span>
                         </td>
-                        <td style={{ padding: '15px 20px', textAlign: 'right' }}>
+                        <td style={{ padding: '6px 10px', fontWeight: 700, fontSize: '10.5px', color: '#475569' }}>
+                          {c.avg_rating !== null && c.avg_rating !== undefined ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, background: '#fefcbf', color: '#a16207', padding: '2px 4px', borderRadius: 6, fontSize: '10px' }}>
+                              ⭐ {c.avg_rating}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#cbd5e1' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                           <button
                             onClick={() => handleViewRoutineFromList(c.email)}
                             style={{
-                              background: '#2d4739', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 6,
-                              cursor: 'pointer', fontWeight: 700, fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: 6
+                              background: '#2d4739', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: 4,
+                              cursor: 'pointer', fontWeight: 700, fontSize: '9px', display: 'inline-flex', alignItems: 'center', gap: 3
                             }}>
-                            <Eye size={14} /> Ver Rutina
+                            <Eye size={10} /> Ver Rutina
                           </button>
                         </td>
                       </tr>
@@ -1656,7 +2077,10 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
             </div>
           ) : activeTab === 'payment_history' ? (
             <div style={{ padding: '0 0 20px 0' }} id="coach-payment-history-view">
-              <h2 className="section-title">Historial de Pagos y Facturas</h2>
+              <h2 className="section-title" style={{ marginBottom: '4px' }}>Historial de Pagos y Facturas</h2>
+              <p style={{ margin: '0 0 20px 0', fontSize: 'clamp(11px, 2vw, 13px)', color: '#64748b', fontWeight: 500, lineHeight: '1.4' }}>
+                Consulta el historial completo de tus transacciones y accede a los detalles de facturación de tus periodos anteriores.
+              </p>
               <div style={{ background: '#fff', borderRadius: 12, padding: 25, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -1695,6 +2119,17 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
             </div>
           ) : (
             <>
+              <div style={{ marginBottom: 20 }}>
+                <h2 className="section-title" style={{ margin: 0, marginBottom: '4px' }}>
+                  {isReadOnly ? "Modificar Rutina" : "Crear Rutina"}
+                </h2>
+                <p style={{ margin: 0, fontSize: 'clamp(11px, 2vw, 13px)', color: '#64748b', fontWeight: 500, lineHeight: '1.4' }}>
+                  {isReadOnly 
+                    ? "Ajusta y personaliza el plan de entrenamiento del atleta para adaptarlo a su progreso y metas actuales." 
+                    : "Registra nuevos atletas en la plataforma y diseña planes de entrenamiento a medida desde cero para impulsar su progreso."}
+                </p>
+              </div>
+
               {isReadOnly && (
                 <button
                   className="btn"
@@ -1717,401 +2152,1209 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                 </div>
               )}
 
-              <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Datos del Atleta</span>
-                {isExistingClient && (
-                  <button
-                    className="btn"
-                    onClick={() => setIsRenewalActive(!isRenewalActive)}
-                    style={{ background: isRenewalActive ? '#ef4444' : '#3b82f6', color: '#fff', fontSize: '0.85rem', padding: '6px 12px' }}
-                  >
-                    {isRenewalActive ? '✓ Cancelar Renovación' : 'Renovar Plan'}
-                  </button>
-                )}
-                {isExistingClient && isRenewalActive && (
-                  <button
-                    className="btn"
-                    onClick={handleAcceptRenewal}
-                    disabled={isLoadingLocal}
-                    style={{ background: '#22c55e', color: '#fff', fontSize: '0.85rem', padding: '6px 12px', marginLeft: '10px' }}
-                  >
-                    {isLoadingLocal ? 'PROCESANDO...' : '✓ Aceptar Renovación'}
-                  </button>
-                )}
-              </div>
-              <div className="grid-inputs">
-                <div className="field">
-                  <label>Buscar Cliente D.B.</label>
-                  <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      list="clients-datalist"
-                      placeholder="Escribe email o nombre..."
-                      value={athlete.email}
-                      disabled={isReadOnly || isCoachBlocked}
-                      style={(isReadOnly || isCoachBlocked) ? { ...lockedStyle, width: '100%' } : { border: '2px solid #a2d149', width: '100%', borderRadius: '8px', padding: '10px' }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setAthlete({ ...athlete, email: val });
-                        const match = clients.find(c => c.email === val || c.name === val);
-                        if (match) handleClientSelect(match.email);
+              {isExistingClient ? (
+                <div 
+                  className="section-title" 
+                  onClick={() => setShowAthleteDetails(!showAthleteDetails)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    background: '#fff',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.01)',
+                    margin: '20px 0'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {showAthleteDetails ? <ChevronUp size={16} color="#64748b" /> : <ChevronDown size={16} color="#64748b" />}
+                    <span style={{ fontWeight: 800 }}>Datos del Atleta</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const nextRenewalState = !isRenewalActive;
+                        setIsRenewalActive(nextRenewalState);
+                        if (nextRenewalState) {
+                          setShowAthleteDetails(true);
+                        }
                       }}
-                    />
-                    {athlete.email && (
+                      style={{ background: isRenewalActive ? '#ef4444' : '#3b82f6', color: '#fff', fontSize: '11px', padding: '6px 10px', fontWeight: 800, textTransform: 'none', borderRadius: '6px' }}
+                    >
+                      {isRenewalActive ? '✓ Cancelar Renovación' : 'Renovar Plan'}
+                    </button>
+                    {isRenewalActive && (
                       <button
                         className="btn"
-                        onClick={() => handleClientSelect('')}
-                        style={{ padding: '8px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAcceptRenewal();
+                        }}
+                        disabled={isLoadingLocal}
+                        style={{ background: '#22c55e', color: '#fff', fontSize: '11px', padding: '6px 10px', fontWeight: 800, textTransform: 'none', borderRadius: '6px' }}
                       >
-                        Limpiar
+                        {isLoadingLocal ? 'PROCESANDO...' : '✓ Aceptar Renovación'}
                       </button>
                     )}
                   </div>
                 </div>
-
-                {user?.role === 'Admin' && (
+              ) : (
+                <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Datos del Atleta</span>
+                </div>
+              )}
+              {(!isExistingClient || showAthleteDetails) && (
+                <div className="grid-inputs" style={{ animation: 'fadeIn 0.25s ease-out' }}>
                   <div className="field">
-                    <label>Filtrar Clientes por Coach</label>
-                    <select
-                      value={selectedCoachId}
-                      onChange={(e) => setSelectedCoachId(e.target.value)}
-                      style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '10px' }}
-                    >
-                      <option value="all">-- Todos los Coaches --</option>
-                      {coaches.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="field">
-                  <label>Estado de Acceso</label>
-                  <div style={{
-                    padding: '10px',
-                    borderRadius: '8px',
-                    background: athlete.is_active ? '#dcfce7' : '#fee2e2',
-                    color: athlete.is_active ? '#166534' : '#ef4444',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    textAlign: 'center',
-                    border: athlete.is_active ? '1px solid #166534' : '1px solid #ef4444',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    opacity: isReadOnly ? 0.7 : 1
-                  }}>
-                    {athlete.is_active ? '✅ ACTIVO' : '❌ INACTIVO'}
-                  </div>
-                </div>
-
-                {user?.role === 'Admin' && (
-                  <div className="field">
-                    <label>Asignar a Coach</label>
-                    <select
-                      value={athlete.coach_id || ""}
-                      onChange={e => setAthlete({ ...athlete, coach_id: e.target.value ? parseInt(e.target.value) : null })}
-                      disabled={isReadOnly || isCoachBlocked}
-                      style={(isReadOnly || isCoachBlocked) ? lockedStyle : { border: '2px solid #a2d149', background: '#fff' }}
-                    >
-                      <option value="">-- Seleccionar Coach --</option>
-                      {coaches.map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="field">
-                  <label>Email (Req. Google Login)</label>
-                  <input
-                    type="email"
-                    value={athlete.email}
-                    disabled={isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')}
-                    style={(isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
-                    onChange={e => setAthlete({ ...athlete, email: e.target.value })}
-                    placeholder="email@gmail.com"
-                  />
-                </div>
-                <div className="field">
-                  <label>Nombre del Cliente</label>
-                  <input
-                    type="text"
-                    value={athlete.name}
-                    disabled={isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')}
-                    style={(isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
-                    onChange={e => setAthlete({ ...athlete, name: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Edad</label>
-                  <input
-                    type="number"
-                    value={athlete.profile.age}
-                    disabled={isReadOnly || isCoachBlocked}
-                    style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val.length <= 2) setAthlete({ ...athlete, profile: { ...athlete.profile, age: val } });
-                    }}
-                  />
-                </div>
-                <div className="field">
-                  <label>Peso (kg)</label>
-                  <input
-                    type="number"
-                    value={athlete.profile.weight}
-                    disabled={isReadOnly || isCoachBlocked}
-                    style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val.length <= 3) setAthlete({ ...athlete, profile: { ...athlete.profile, weight: val } });
-                    }}
-                  />
-                </div>
-                <div className="field">
-                  <label>Objetivo</label>
-                  <select
-                    value={athlete.profile.goal}
-                    disabled={isReadOnly || isCoachBlocked}
-                    style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
-                    onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, goal: e.target.value } })}
-                  >
-                    <option>Definición Muscular</option>
-                    <option>Volumen Muscular</option>
-                    <option>Mantenimiento Físico</option>
-                    <option>Recomposicion Corporal</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Tipo de Plan</label>
-                  <select
-                    value={athlete.profile.planType}
-                    disabled={isReadOnly || isCoachBlocked || isContractLocked}
-                    style={(isReadOnly || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
-                    onChange={e => {
-                      const newPlan = e.target.value;
-                      let days = 30;
-                      if (newPlan === 'Dos meses') days = 60;
-                      if (newPlan === 'Trimestral') days = 90;
-                      const d = new Date(athlete.profile.startDate + 'T12:00:00');
-                      d.setDate(d.getDate() + days);
-                      const newEnd = d.toISOString().split('T')[0];
-                      setAthlete({ ...athlete, profile: { ...athlete.profile, planType: newPlan, endDate: newEnd } });
-                    }}>
-                    <option value="Mensual">Mensual</option>
-                    <option value="Dos meses">Dos meses</option>
-                    <option value="Trimestral">Trimestral</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Fecha de Inicio</label>
-                  <input
-                    type="date"
-                    value={athlete.profile.startDate}
-                    disabled={isReadOnly || isCoachBlocked || isContractLocked}
-                    style={(isReadOnly || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
-                    onChange={e => {
-                      const newStart = e.target.value;
-                      const dControl = new Date(newStart + 'T12:00:00');
-                      dControl.setMonth(dControl.getMonth() + 1);
-                      const newControl = dControl.toISOString().split('T')[0];
-
-                      let days = 30;
-                      if (athlete.profile.planType === 'Dos meses') days = 60;
-                      if (athlete.profile.planType === 'Trimestral') days = 90;
-                      const dEnd = new Date(newStart + 'T12:00:00');
-                      dEnd.setDate(dEnd.getDate() + days);
-                      const newEnd = dEnd.toISOString().split('T')[0];
-
-                      // Auto-calculate is_active status
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      const start = new Date(newStart + 'T12:00:00');
-                      start.setHours(0, 0, 0, 0);
-                      const shouldBeActive = start <= today;
-
-                      setAthlete({
-                        ...athlete,
-                        is_active: shouldBeActive,
-                        profile: { ...athlete.profile, startDate: newStart, endDate: newEnd, controlDate: newControl }
-                      });
-                    }}
-                  />
-                </div>
-                <div className="field">
-                  <label>Fecha Final del Plan</label>
-                  <input
-                    type="date"
-                    value={athlete.profile.endDate}
-                    disabled={isReadOnly || isCoachBlocked || isContractLocked || user?.role === 'Coach'}
-                    style={(isReadOnly || isCoachBlocked || isContractLocked || user?.role === 'Coach') ? lockedStyle : {}}
-                    onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, endDate: e.target.value } })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Fecha de Control</label>
-                  <input
-                    type="date"
-                    value={athlete.profile.controlDate}
-                    disabled={isReadOnly || isCoachBlocked}
-                    style={(isReadOnly || isCoachBlocked) ? lockedStyle : {}}
-                    onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, controlDate: e.target.value } })}
-                  />
-                </div>
-              </div>
-
-              <div className="section-title">Configurar Rutina</div>
-              <div className="days-selector">
-                {daysOfWeek.map(day => (
-                  <label key={day}>
-                    <input
-                      type="checkbox"
-                      checked={selectedDays.includes(day)}
-                      disabled={isReadOnly || isCoachBlocked}
-                      onChange={() => handleDayToggle(day)}
-                    />
-                    {day}
-                  </label>
-                ))}
-                {!isReadOnly && (
-                  <button
-                    className="btn btn-add-day main-add-btn"
-                    onClick={renderDays}
-                    disabled={(!athlete.is_active && !isRenewalActive) || isCoachBlocked}
-                    style={((!athlete.is_active && !isRenewalActive) || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {}}
-                    title={isCoachBlocked ? "Tu cuenta está inactiva" : (!athlete.is_active && !isRenewalActive ? "No se puede configurar rutina para atletas inactivos" : "")}
-                  >
-                    Crear Días
-                  </button>
-                )}
-              </div>
-
-              <div id="routine-builder">
-                {routineDays.map(day => (
-                  <div key={day.name} className="day-container">
-                    <div className="day-header">
-                      {day.name}
-                      {!isReadOnly && <button className="btn btn-add-day" onClick={() => addGroup(day.name)} disabled={isCoachBlocked} style={isCoachBlocked ? lockedStyle : {}}>+ Bloque</button>}
+                    <label>Buscar Cliente D.B.</label>
+                    <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        list="clients-datalist"
+                        placeholder="Escribe email o nombre..."
+                        value={athlete.email}
+                        disabled={isReadOnly || isCoachBlocked}
+                        style={(isReadOnly || isCoachBlocked) ? { ...lockedStyle, width: '100%' } : { border: '2px solid #a2d149', width: '100%', borderRadius: '8px', padding: '8px 12px' }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setAthlete({ ...athlete, email: val });
+                          const match = clients.find(c => c.email === val || c.name === val);
+                          if (match) handleClientSelect(match.email);
+                        }}
+                      />
+                      {athlete.email && (
+                        <button
+                          className="btn"
+                          onClick={() => handleClientSelect('')}
+                          style={{ padding: '8px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}
+                        >
+                          Limpiar
+                        </button>
+                      )}
                     </div>
+                  </div>
 
-                    <div className="day-groups">
-                      {day.groups.map(group => (
-                        <div key={group.id} className="exercise-group">
-                          {!isReadOnly && <button className="btn btn-del" onClick={() => removeGroup(day.name, group.id)} disabled={isCoachBlocked} style={isCoachBlocked ? lockedStyle : {}}>Eliminar</button>}
+                  {user?.role === 'Admin' && (
+                    <div className="field">
+                      <label>Filtrar Clientes por Coach</label>
+                      <select
+                        value={selectedCoachId}
+                        onChange={(e) => setSelectedCoachId(e.target.value)}
+                        style={{ border: '2px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px' }}
+                      >
+                        <option value="all">-- Todos los Coaches --</option>
+                        {coaches.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                          <div className="rows-holder">
-                            {group.exercises.map((ex, idx) => (
-                              <div
-                                key={ex.id}
-                                className="exercise-sub-row"
-                                onMouseEnter={() => { if (ex.img) preloadImage(ex.img); }}
-                              >
-                                <div className="field">
+                  <div className="field">
+                    <label>Estado de Acceso</label>
+                    <div style={{
+                      padding: '8px',
+                      borderRadius: '8px',
+                      background: athlete.is_active ? '#dcfce7' : '#fee2e2',
+                      color: athlete.is_active ? '#166534' : '#ef4444',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      textAlign: 'center',
+                      border: athlete.is_active ? '1px solid #166534' : '1px solid #ef4444',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      opacity: isReadOnly ? 0.7 : 1
+                    }}>
+                      {athlete.is_active ? '✅ ACTIVO' : '❌ INACTIVO'}
+                    </div>
+                  </div>
 
-                                  <label>{idx === 0 ? 'EJERCICIO' : 'EJERCICIO B'}</label>
-                                  <input
-                                    type="text"
-                                    list="exercises-list"
-                                    className="sel-name"
-                                    placeholder="Buscar ejercicio..."
-                                    value={ex.name}
-                                    disabled={isReadOnly}
-                                    style={isReadOnly ? lockedStyle : {}}
-                                    onChange={(e) => updateExercise(day.name, group.id, ex.id, 'name', e.target.value)}
-                                    onFocus={(e) => e.target.select()}
+                  {user?.role === 'Admin' && (
+                    <div className="field">
+                      <label>Asignar a Coach</label>
+                      <select
+                        value={athlete.coach_id || ""}
+                        onChange={e => setAthlete({ ...athlete, coach_id: e.target.value ? parseInt(e.target.value) : null })}
+                        disabled={isReadOnly || isCoachBlocked}
+                        style={(isReadOnly || isCoachBlocked) ? lockedStyle : { border: '2px solid #a2d149', background: '#fff' }}
+                      >
+                        <option value="">-- Seleccionar Coach --</option>
+                        {coaches.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="field">
+                    <label>Email (Req. Google Login)</label>
+                    <input
+                      type="email"
+                      value={athlete.email}
+                      disabled={isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')}
+                      style={(isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
+                      onChange={e => setAthlete({ ...athlete, email: e.target.value })}
+                      placeholder="email@gmail.com"
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Nombre del Cliente</label>
+                    <input
+                      type="text"
+                      value={athlete.name}
+                      disabled={isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')}
+                      style={(isReadOnly || isCoachBlocked || (isExistingClient && user?.role !== 'Admin')) ? lockedStyle : {}}
+                      onChange={e => setAthlete({ ...athlete, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Edad</label>
+                    <input
+                      type="number"
+                      value={athlete.profile.age}
+                      disabled={(isReadOnly && !isRenewalActive) || isCoachBlocked}
+                      style={((isReadOnly && !isRenewalActive) || isCoachBlocked) ? lockedStyle : {}}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val.length <= 2) setAthlete({ ...athlete, profile: { ...athlete.profile, age: val } });
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Peso (kg)</label>
+                    <input
+                      type="number"
+                      value={athlete.profile.weight}
+                      disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked}
+                      style={((isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked) ? lockedStyle : { border: '2px solid #a2d149', borderRadius: '8px', padding: '8px 12px' }}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val.length <= 3) setAthlete({ ...athlete, profile: { ...athlete.profile, weight: val } });
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Objetivo</label>
+                    <select
+                      value={athlete.profile.goal}
+                      disabled={(isReadOnly && !isRenewalActive) || isCoachBlocked}
+                      style={((isReadOnly && !isRenewalActive) || isCoachBlocked) ? lockedStyle : {}}
+                      onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, goal: e.target.value } })}
+                    >
+                      <option>Definición Muscular</option>
+                      <option>Volumen Muscular</option>
+                      <option>Mantenimiento Físico</option>
+                      <option>Recomposicion Corporal</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Tipo de Plan</label>
+                    <select
+                      value={athlete.profile.planType}
+                      disabled={(isReadOnly && !isRenewalActive) || isCoachBlocked || isContractLocked}
+                      style={((isReadOnly && !isRenewalActive) || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
+                      onChange={e => {
+                        const newPlan = e.target.value;
+                        let days = 30;
+                        if (newPlan === 'Dos meses') days = 60;
+                        if (newPlan === 'Trimestral') days = 90;
+                        const d = new Date(athlete.profile.startDate + 'T12:00:00');
+                        d.setDate(d.getDate() + days);
+                        const newEnd = d.toISOString().split('T')[0];
+                        setAthlete({ ...athlete, profile: { ...athlete.profile, planType: newPlan, endDate: newEnd } });
+                      }}>
+                      <option value="Mensual">Mensual</option>
+                      <option value="Dos meses">Dos meses</option>
+                      <option value="Trimestral">Trimestral</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Fecha de Inicio</label>
+                    <input
+                      type="date"
+                      value={athlete.profile.startDate}
+                      disabled={(isReadOnly && !isRenewalActive) || isCoachBlocked || isContractLocked}
+                      style={((isReadOnly && !isRenewalActive) || isCoachBlocked || isContractLocked) ? lockedStyle : {}}
+                      onChange={e => {
+                        const newStart = e.target.value;
+                        const dControl = new Date(newStart + 'T12:00:00');
+                        dControl.setMonth(dControl.getMonth() + 1);
+                        const newControl = dControl.toISOString().split('T')[0];
+
+                        let days = 30;
+                        if (athlete.profile.planType === 'Dos meses') days = 60;
+                        if (athlete.profile.planType === 'Trimestral') days = 90;
+                        const dEnd = new Date(newStart + 'T12:00:00');
+                        dEnd.setDate(dEnd.getDate() + days);
+                        const newEnd = dEnd.toISOString().split('T')[0];
+
+                        // Auto-calculate is_active status
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const start = new Date(newStart + 'T12:00:00');
+                        start.setHours(0, 0, 0, 0);
+                        const shouldBeActive = start <= today;
+
+                        setAthlete({
+                          ...athlete,
+                          is_active: shouldBeActive,
+                          profile: { ...athlete.profile, startDate: newStart, endDate: newEnd, controlDate: newControl }
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Fecha Final del Plan</label>
+                    <input
+                      type="date"
+                      value={athlete.profile.endDate}
+                      disabled={(isReadOnly && !isRenewalActive) || isCoachBlocked || isContractLocked || user?.role === 'Coach'}
+                      style={((isReadOnly && !isRenewalActive) || isCoachBlocked || isContractLocked || user?.role === 'Coach') ? lockedStyle : {}}
+                      onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, endDate: e.target.value } })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Fecha de Control</label>
+                    <input
+                      type="date"
+                      value={athlete.profile.controlDate}
+                      disabled={(isReadOnly && !isRenewalActive) || isCoachBlocked}
+                      style={((isReadOnly && !isRenewalActive) || isCoachBlocked) ? lockedStyle : {}}
+                      onChange={e => setAthlete({ ...athlete, profile: { ...athlete.profile, controlDate: e.target.value } })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Weight Progress Section for Existing Clients */}
+              {athlete.id && (
+                <div style={{ marginTop: '25px', marginBottom: '25px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowWeightProgress(!showWeightProgress)}
+                    style={{
+                      width: '100%',
+                      background: '#fff',
+                      color: '#2d4739',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '14px 20px',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.02)'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.borderColor = '#a2d149'}
+                    onMouseOut={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      📈 Historial de Peso del Atleta
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: '20px' }}>
+                        {weightHistory.length} {weightHistory.length === 1 ? 'registro' : 'registros'}
+                      </span>
+                    </span>
+                    {showWeightProgress ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </button>
+
+                  {showWeightProgress && (() => {
+                    const MONTH_NAMES_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                    const formatDateSpanish = (dateObj: Date) => {
+                        const day = dateObj.getDate();
+                        const month = MONTH_NAMES_SHORT[dateObj.getMonth()];
+                        return `${day} ${month}`;
+                    };
+
+                    const processedData = (() => {
+                      if (weightFilter === 'month') {
+                        const now = new Date();
+                        const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+                        const filtered = weightHistory.filter(item => {
+                          const parts = item.date.split('-');
+                          const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                          return rDate >= cutoff;
+                        });
+                        const sorted = [...filtered].sort((a, b) => a.date.localeCompare(b.date));
+                        return sorted.map(item => {
+                          const parts = item.date.split('-');
+                          const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                          return {
+                            label: formatDateSpanish(rDate),
+                            weight: Number(item.weight),
+                            originalDate: item.date,
+                            notes: item.notes || 'Registro de peso'
+                          };
+                        });
+                      } else {
+                        const now = new Date();
+                        const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 365);
+                        const groups: { [key: string]: { weights: number[], monthIndex: number, year: number } } = {};
+                        
+                        weightHistory.forEach(item => {
+                          const parts = item.date.split('-');
+                          const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                          if (rDate >= cutoff) {
+                            const yearMonth = `${parts[0]}-${parts[1]}`;
+                            if (!groups[yearMonth]) {
+                              groups[yearMonth] = {
+                                weights: [],
+                                monthIndex: rDate.getMonth(),
+                                year: rDate.getFullYear()
+                              };
+                            }
+                            groups[yearMonth].weights.push(Number(item.weight));
+                          }
+                        });
+
+                        const sortedKeys = Object.keys(groups).sort();
+                        return sortedKeys.map(key => {
+                          const group = groups[key];
+                          const avgWeight = group.weights.reduce((sum, val) => sum + val, 0) / group.weights.length;
+                          return {
+                            label: MONTH_NAMES_SHORT[group.monthIndex],
+                            weight: Math.round(avgWeight * 10) / 10,
+                            originalDate: `${MONTH_NAMES_SHORT[group.monthIndex]} ${group.year}`,
+                            notes: `Promedio mensual (${group.weights.length} registros)`
+                          };
+                        });
+                      }
+                    })();
+
+                    const filteredHistoryForCards = weightHistory.filter(item => {
+                      const parts = item.date.split('-');
+                      const rDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                      const now = new Date();
+                      const limitDays = weightFilter === 'month' ? 30 : 365;
+                      const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - limitDays);
+                      return rDate >= cutoff;
+                    }).sort((a, b) => b.date.localeCompare(a.date));
+
+                    const chartWidth = 550;
+                    const chartHeight = 250;
+                    const paddingTop = 25;
+                    const paddingBottom = 40;
+                    const paddingLeft = 45;
+                    const paddingRight = 25;
+                    const drawWidth = chartWidth - paddingLeft - paddingRight;
+                    const drawHeight = chartHeight - paddingTop - paddingBottom;
+
+                    const weights = processedData.map(d => d.weight);
+                    const maxW = weights.length > 0 ? Math.max(...weights) : 80;
+                    const minW = weights.length > 0 ? Math.min(...weights) : 60;
+                    
+                    const minY = Math.max(0, minW - 10);
+                    const maxY = maxW === minW ? minW + 10 : maxW + 10;
+                    
+                    const getX = (index: number) => {
+                      if (processedData.length <= 1) return paddingLeft + drawWidth / 2;
+                      return paddingLeft + (index / (processedData.length - 1)) * drawWidth;
+                    };
+
+                    const getY = (weight: number) => {
+                      const denom = maxY - minY;
+                      if (denom === 0) return paddingTop + drawHeight / 2;
+                      return chartHeight - paddingBottom - ((weight - minY) / denom) * drawHeight;
+                    };
+
+                    let linePathStr = '';
+                    let areaPathStr = '';
+                    if (processedData.length > 1) {
+                      const pts = processedData.map((d, i) => ({ x: getX(i), y: getY(d.weight) }));
+                      linePathStr = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                      areaPathStr = `${linePathStr} L ${pts[pts.length - 1].x} ${chartHeight - paddingBottom} L ${pts[0].x} ${chartHeight - paddingBottom} Z`;
+                    }
+                    
+                    const gridSteps = 3;
+                    const gridLines = [];
+                    for (let i = 0; i <= gridSteps; i++) {
+                      gridLines.push(minY + (i * (maxY - minY)) / gridSteps);
+                    }
+
+                    return (
+                      <div style={{
+                        background: '#fff',
+                        border: '2px solid #a2d149',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        marginTop: '10px',
+                        animation: 'fadeIn 0.3s ease-out',
+                        boxShadow: '0 10px 20px rgba(0,0,0,0.05)'
+                      }}>
+                        {/* Selector de periodo */}
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', gap: '10px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setWeightFilter('month')}
+                            style={{
+                              padding: '8px 20px',
+                              borderRadius: '50px',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              background: weightFilter === 'month' ? '#a2d149' : '#f1f5f9',
+                              color: weightFilter === 'month' ? '#fff' : '#64748b',
+                              boxShadow: weightFilter === 'month' ? '0 4px 12px rgba(162, 209, 73, 0.25)' : 'none'
+                            }}
+                          >
+                            Mes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWeightFilter('year')}
+                            style={{
+                              padding: '8px 20px',
+                              borderRadius: '50px',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              background: weightFilter === 'year' ? '#a2d149' : '#f1f5f9',
+                              color: weightFilter === 'year' ? '#fff' : '#64748b',
+                              boxShadow: weightFilter === 'year' ? '0 4px 12px rgba(162, 209, 73, 0.25)' : 'none'
+                            }}
+                          >
+                            Año
+                          </button>
+                        </div>
+
+                        {/* Contenedor del Gráfico SVG */}
+                        <div style={{ position: 'relative', width: '100%', background: '#fafafa', borderRadius: '12px', padding: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                          {processedData.length === 0 ? (
+                            <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 600 }}>
+                              No hay registros de peso en los últimos {weightFilter === 'month' ? '30 días' : '365 días'}.
+                            </div>
+                          ) : (
+                            <>
+                              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} width="100%" height="auto" style={{ overflow: 'visible' }}>
+                                <defs>
+                                  <linearGradient id="coachWeightGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a2d149" stopOpacity="0.4" />
+                                    <stop offset="100%" stopColor="#a2d149" stopOpacity="0.0" />
+                                  </linearGradient>
+                                </defs>
+
+                                {/* Grid Lines */}
+                                {gridLines.map((val, idx) => {
+                                  const y = getY(val);
+                                  return (
+                                    <g key={idx}>
+                                      <line
+                                        x1={paddingLeft}
+                                        y1={y}
+                                        x2={chartWidth - paddingRight}
+                                        y2={y}
+                                        stroke="#e2e8f0"
+                                        strokeDasharray="4 4"
+                                      />
+                                      <text
+                                        x={paddingLeft - 8}
+                                        y={y}
+                                        textAnchor="end"
+                                        dominantBaseline="middle"
+                                        fill="#64748b"
+                                        fontSize="10"
+                                        fontWeight="700"
+                                      >
+                                        {Math.round(val)} kg
+                                      </text>
+                                    </g>
+                                  );
+                                })}
+
+                                {/* Area */}
+                                {areaPathStr && (
+                                  <path d={areaPathStr} fill="url(#coachWeightGrad)" />
+                                )}
+
+                                {/* Line */}
+                                {linePathStr && (
+                                  <path
+                                    d={linePathStr}
+                                    fill="none"
+                                    stroke="#a2d149"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                   />
-                                </div>
+                                )}
 
-                                <div className="field">
-                                  <label>MÉTRICA</label>
-                                  <div className="metric-split">
-                                    {ex.isCardio ? (
-                                      <div className="metric-field">
-                                        <label>TIEMPO (MIN)</label>
-                                        <input
-                                          type="text"
-                                          placeholder="00"
-                                          value={ex.series}
-                                          disabled={isReadOnly}
-                                          style={{ width: 100, ...(isReadOnly ? lockedStyle : {}) }}
-                                          onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (val.length <= 2) updateExercise(day.name, group.id, ex.id, 'series', val);
-                                          }}
-                                        />
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <div className="metric-field">
-                                          <label>SERIES</label>
-                                          <input
-                                            type="text"
-                                            placeholder="S"
-                                            value={ex.series}
-                                            disabled={isReadOnly}
-                                            style={isReadOnly ? lockedStyle : {}}
-                                            onChange={(e) => {
-                                              const val = e.target.value;
-                                              if (val.length <= 1) updateExercise(day.name, group.id, ex.id, 'series', val);
-                                            }}
-                                          />
-                                        </div>
-                                        <div className="metric-field">
-                                          <label>REPS</label>
-                                          <input
-                                            type="text"
-                                            placeholder="R"
-                                            value={ex.reps}
-                                            disabled={isReadOnly}
-                                            style={isReadOnly ? lockedStyle : {}}
-                                            onChange={(e) => {
-                                              const val = e.target.value;
-                                              if (val.length <= 3) updateExercise(day.name, group.id, ex.id, 'reps', val);
-                                            }}
-                                          />
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
+                                {/* X-axis labels */}
+                                {processedData.map((d, idx) => {
+                                  const x = getX(idx);
+                                  const totalLabels = processedData.length;
+                                  const showLabel = 
+                                    weightFilter === 'year' || 
+                                    totalLabels <= 8 || 
+                                    idx === 0 || 
+                                    idx === totalLabels - 1 || 
+                                    idx % Math.ceil(totalLabels / 6) === 0;
 
-                                <div className="field field-notes">
-                                  <label>NOTAS DEL COACH</label>
-                                  <textarea
-                                    rows={3}
-                                    value={ex.note}
-                                    disabled={isReadOnly}
-                                    style={isReadOnly ? lockedStyle : {}}
-                                    onChange={(e) => updateExercise(day.name, group.id, ex.id, 'note', e.target.value)}
-                                  />
-                                </div>
+                                  if (!showLabel) return null;
 
-                                <div className="img-preview-box">
-                                  {ex.img ? (
-                                    <ExerciseImage src={ex.img} alt={ex.name} />
-                                  ) : (
-                                    <span>+ FOTO (Auto)</span>
-                                  )}
+                                  return (
+                                    <g key={idx}>
+                                      <text
+                                        x={x}
+                                        y={chartHeight - paddingBottom + 18}
+                                        textAnchor="middle"
+                                        fill="#64748b"
+                                        fontSize="9"
+                                        fontWeight="800"
+                                      >
+                                        {d.label}
+                                      </text>
+                                      <line
+                                        x1={x}
+                                        y1={chartHeight - paddingBottom}
+                                        x2={x}
+                                        y2={chartHeight - paddingBottom + 4}
+                                        stroke="#cbd5e1"
+                                      />
+                                    </g>
+                                  );
+                                })}
+
+                                {/* Circles */}
+                                {processedData.map((d, idx) => {
+                                  const x = getX(idx);
+                                  const y = getY(d.weight);
+                                  const isHovered = hoveredPoint && hoveredPoint.index === idx;
+
+                                  return (
+                                    <circle
+                                      key={idx}
+                                      cx={x}
+                                      cy={y}
+                                      r={isHovered ? 7 : 4}
+                                      fill={isHovered ? "#2d4739" : "#a2d149"}
+                                      stroke="#fff"
+                                      strokeWidth={isHovered ? 2.5 : 1.5}
+                                      style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
+                                      onMouseEnter={() => setHoveredPoint({ ...d, index: idx, x, y })}
+                                      onMouseLeave={() => setHoveredPoint(null)}
+                                    />
+                                  );
+                                })}
+                              </svg>
+
+                              {/* Tooltip */}
+                              {hoveredPoint && (
+                                <div style={{
+                                  position: 'absolute',
+                                  left: `${(hoveredPoint.x / chartWidth) * 100}%`,
+                                  top: `${(hoveredPoint.y / chartHeight) * 100 - 30}px`,
+                                  transform: 'translate(-50%, -100%)',
+                                  background: '#111',
+                                  color: '#fff',
+                                  padding: '8px 12px',
+                                  borderRadius: '10px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+                                  pointerEvents: 'none',
+                                  zIndex: 10,
+                                  whiteSpace: 'nowrap',
+                                  border: '1px solid #a2d149',
+                                  textAlign: 'center',
+                                  animation: 'fadeIn 0.15s ease-out'
+                                }}>
+                                  <div style={{ color: '#a2d149', fontSize: '13px', fontWeight: 900 }}>{hoveredPoint.weight} kg</div>
+                                  <div style={{ fontSize: '9px', opacity: 0.8, marginTop: '2px' }}>{hoveredPoint.originalDate}</div>
+                                  <div style={{ fontSize: '8px', opacity: 0.6, marginTop: '2px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{hoveredPoint.notes}</div>
+                                  <div style={{
+                                    position: 'absolute',
+                                    bottom: '-5px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: 0,
+                                    height: 0,
+                                    borderLeft: '5px solid transparent',
+                                    borderRight: '5px solid transparent',
+                                    borderTop: '5px solid #111'
+                                  }} />
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* List of cards */}
+                        {filteredHistoryForCards.length === 0 ? (
+                          <p style={{ textAlign: 'center', color: '#666', padding: '10px' }}>No hay registros en este período.</p>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {filteredHistoryForCards.map((item) => (
+                              <div key={item.id} style={{
+                                background: '#f8fafc', padding: '8px 15px', borderRadius: '12px',
+                                borderLeft: '4px solid #a2d149', display: 'flex',
+                                justifyContent: 'space-between', alignItems: 'center',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                              }}>
+                                <div>
+                                  <div style={{ fontSize: '9px', fontWeight: 800, color: '#a38210', textTransform: 'uppercase' }}>{item.date}</div>
+                                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#444', marginTop: '2px' }}>{item.notes || 'Registro de peso'}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#111' }}>{item.weight}<span style={{ fontSize: '11px', marginLeft: '2px', fontWeight: 800 }}>kg</span></div>
                                 </div>
                               </div>
                             ))}
                           </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
-                          {!isReadOnly && group.exercises.length < 2 && (
-                            <button className="btn btn-biserie" onClick={() => addBiserie(day.name, group.id)} disabled={isCoachBlocked} style={isCoachBlocked ? lockedStyle : {}}>
-                              + AGREGAR BISERIE
-                            </button>
-                          )}
-                          <div className="rest-time-label">
-                            ⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE
-                          </div>
+              {isReadOnly && !isModifyingRoutine && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                  <button
+                    type="button"
+                    onClick={startModifyingRoutine}
+                    disabled={isCoachBlocked}
+                    style={{
+                      background: '#22c55e',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontWeight: 800,
+                      fontSize: '11px',
+                      cursor: isCoachBlocked ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 10px rgba(34, 197, 94, 0.15)',
+                      transition: 'all 0.2s',
+                      opacity: isCoachBlocked ? 0.7 : 1,
+                      textTransform: 'none'
+                    }}
+                    onMouseOver={e => !isCoachBlocked && (e.currentTarget.style.background = '#16a34a')}
+                    onMouseOut={e => !isCoachBlocked && (e.currentTarget.style.background = '#22c55e')}
+                  >
+                    <Edit2 size={14} /> Modificar rutina
+                  </button>
+                </div>
+              )}
+
+              {(!isReadOnly || isModifyingRoutine || isRenewalActive) && (
+                <>
+                  {/* Collapsible Templates Section */}
+                  <div style={{
+                    background: '#fff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
+                    marginBottom: '16px',
+                    overflow: 'hidden',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {/* Header bar / Toggle Button */}
+                    <button
+                      onClick={() => setIsTemplatesExpanded(!isTemplatesExpanded)}
+                      disabled={isCoachBlocked}
+                      style={{
+                        width: '100%',
+                        background: 'none',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        cursor: isCoachBlocked ? 'not-allowed' : 'pointer',
+                        textAlign: 'left',
+                        outline: 'none'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{
+                          background: 'rgba(162, 209, 73, 0.1)',
+                          color: '#2d4739',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          fontSize: '14px'
+                        }}>
+                          ⚡
+                        </span>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '12.5px', fontWeight: 800, color: '#2d4739', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Plantillas de Rutina Predefinidas
+                          </h3>
+                          <p style={{ margin: '1px 0 0 0', fontSize: '10.5px', color: '#64748b', fontWeight: 500 }}>
+                            Carga una base de entrenamiento completa y edítala en segundos
+                          </p>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                      <div style={{ color: '#64748b' }}>
+                        {isTemplatesExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                    </button>
+
+                    {/* Collapsible Content */}
+                    {isTemplatesExpanded && (
+                      <div style={{
+                        padding: '0 16px 16px 16px',
+                        borderTop: '1px solid #f1f5f9',
+                        animation: 'fadeIn 0.25s ease-out'
+                      }}>
+                        <p style={{ fontSize: '11px', color: '#64748b', lineHeight: '1.4', margin: '10px 0' }}>
+                          Selecciona una plantilla base según el objetivo de tu atleta. Se configurarán automáticamente 5 días de entrenamiento (Lunes a Viernes) con 5 ejercicios diarios intercalando tren superior y tren inferior (4 series de 10 repeticiones, o 30 minutos para cardio).
+                        </p>
+
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                          gap: '10px',
+                          marginTop: '8px'
+                        }}>
+                          {Object.entries(TEMPLATES_DATA).map(([key, template]) => (
+                            <button
+                              key={key}
+                              onClick={() => applyTemplate(key)}
+                              style={{
+                                background: '#f8fafc',
+                                border: '2px solid #e2e8f0',
+                                borderRadius: '8px',
+                                padding: '12px 14px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                outline: 'none'
+                              }}
+                              onMouseOver={e => {
+                                e.currentTarget.style.borderColor = '#a2d149';
+                                e.currentTarget.style.background = '#f0fdf4';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                              }}
+                              onMouseOut={e => {
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                e.currentTarget.style.background = '#f8fafc';
+                                e.currentTarget.style.transform = 'none';
+                              }}
+                            >
+                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#2d4739' }}>
+                                {template.name}
+                              </span>
+                              <span style={{ fontSize: '10.5px', color: '#64748b', lineHeight: '1.3', fontWeight: 500 }}>
+                                {template.description}
+                              </span>
+                              <span style={{
+                                fontSize: '9.5px',
+                                color: '#a2d149',
+                                fontWeight: 700,
+                                marginTop: '2px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px'
+                              }}>
+                                Cargar plantilla →
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
+
+                  <div className="section-title">Configurar Rutina</div>
+                  <div className="days-selector">
+                    {daysOfWeek.map(day => (
+                      <label key={day}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDays.includes(day)}
+                          disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked}
+                          onChange={() => handleDayToggle(day)}
+                        />
+                        {day}
+                      </label>
+                    ))}
+                    <button
+                      className="btn btn-add-day main-add-btn"
+                      onClick={renderDays}
+                      disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || (!isReadOnly && !athlete.is_active && !isRenewalActive) || isCoachBlocked}
+                      style={(((isReadOnly && !isModifyingRoutine && !isRenewalActive) || (!isReadOnly && !athlete.is_active && !isRenewalActive) || isCoachBlocked) ? { ...lockedStyle, backgroundColor: '#cbd5e1', color: '#64748b' } : {})}
+                      title={isCoachBlocked ? "Tu cuenta está inactiva" : ((isReadOnly && !isModifyingRoutine && !isRenewalActive) ? "Haz clic en Modificar Rutina primero" : (!athlete.is_active && !isRenewalActive ? "No se puede configurar rutina para atletas inactivos" : ""))}
+                    >
+                      Crear Días
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <div id="routine-builder">
+                {routineDays.map(day => {
+                  const groupsList = day.groups || [];
+                  let activeIndex = activeBlockIndices[day.name] || 0;
+                  if (activeIndex >= groupsList.length && groupsList.length > 0) {
+                    activeIndex = groupsList.length - 1;
+                  }
+                  const activeGroup = groupsList[activeIndex];
+                  const isExpanded = !isReadOnly || !!expandedDays[day.name];
+
+                  return (
+                    <div key={day.name} className="day-container" style={{ marginBottom: '25px', background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.01)' }}>
+                      {/* Cabecera del Día */}
+                      <div 
+                        className="day-header" 
+                        onClick={() => isReadOnly && toggleDayExpanded(day.name)}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between', 
+                          padding: '15px 20px', 
+                          background: '#f8fafc', 
+                          borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none',
+                          cursor: isReadOnly ? 'pointer' : 'default',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {isReadOnly && (
+                            isExpanded ? <ChevronUp size={16} color="#64748b" style={{ marginRight: '4px' }} /> : <ChevronDown size={16} color="#64748b" style={{ marginRight: '4px' }} />
+                          )}
+                          <span style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', color: '#2d4739' }}>{day.name}</span>
+                          {dayRatings[day.name] !== undefined && (
+                            <span style={{ fontSize: '11px', fontWeight: 800, background: '#fefcbf', color: '#a16207', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px', textTransform: 'none' }}>
+                              Promedio: ⭐ {dayRatings[day.name]} / 5
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div style={{ padding: '20px' }}>
+                          {groupsList.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '30px', background: '#f8fafc', borderRadius: '12px', border: '2px dashed #cbd5e1' }}>
+                              <p style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, margin: '0 0 15px 0' }}>
+                                No hay bloques de ejercicios creados para este día.
+                              </p>
+                              {(!isReadOnly || isModifyingRoutine || isRenewalActive) && !isCoachBlocked && (
+                                <button
+                                  type="button"
+                                  onClick={() => addGroup(day.name)}
+                                  disabled={isCoachBlocked}
+                                  style={{
+                                    background: '#2d4739',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '10px 20px',
+                                    borderRadius: '8px',
+                                    fontWeight: 800,
+                                    fontSize: '12px',
+                                    cursor: isCoachBlocked ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 4px 10px rgba(45, 71, 57, 0.15)'
+                                  }}
+                                >
+                                  + Agregar Primer Bloque
+                                </button>
+                              )}
+                          </div>
+                        ) : (
+                          <>
+                            {/* Navegador del Carrusel de Bloques */}
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '12px',
+                              marginBottom: '20px',
+                              background: '#f8fafc',
+                              padding: '16px',
+                              borderRadius: '12px',
+                              border: '1px solid #f1f5f9'
+                            }}>
+                              {/* Conteo de bloques arriba */}
+                              <span style={{ fontSize: '14px', fontWeight: 900, color: '#2d4739', letterSpacing: '0.5px' }}>
+                                Bloque {activeIndex + 1} de {groupsList.length}
+                              </span>
+
+                              {/* Botones Anterior y Siguiente uno al lado del otro */}
+                              <div style={{ display: 'flex', gap: '10px', width: '100%', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  disabled={activeIndex === 0}
+                                  onClick={() => setActiveBlockIndices(prev => ({ ...prev, [day.name]: activeIndex - 1 }))}
+                                  style={{
+                                    background: activeIndex === 0 ? '#cbd5e1' : '#2d4739',
+                                    color: activeIndex === 0 ? '#94a3b8' : '#fff',
+                                    border: 'none',
+                                    padding: '8px 20px',
+                                    borderRadius: '8px',
+                                    fontWeight: 800,
+                                    fontSize: '11px',
+                                    cursor: activeIndex === 0 ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s',
+                                    flex: '1',
+                                    maxWidth: '140px',
+                                    textAlign: 'center',
+                                    opacity: activeIndex === 0 ? 0.6 : 1
+                                  }}
+                                >
+                                  ◀ Anterior
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={activeIndex >= groupsList.length - 1}
+                                  onClick={() => setActiveBlockIndices(prev => ({ ...prev, [day.name]: activeIndex + 1 }))}
+                                  style={{
+                                    background: activeIndex >= groupsList.length - 1 ? '#cbd5e1' : '#2d4739',
+                                    color: activeIndex >= groupsList.length - 1 ? '#94a3b8' : '#fff',
+                                    border: 'none',
+                                    padding: '8px 20px',
+                                    borderRadius: '8px',
+                                    fontWeight: 800,
+                                    fontSize: '11px',
+                                    cursor: activeIndex >= groupsList.length - 1 ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s',
+                                    flex: '1',
+                                    maxWidth: '140px',
+                                    textAlign: 'center',
+                                    opacity: activeIndex >= groupsList.length - 1 ? 0.6 : 1
+                                  }}
+                                >
+                                  Siguiente ▶
+                                </button>
+                              </div>
+
+                              {/* Botones de acción en una fila separada si se permiten */}
+                              {(!isReadOnly || isModifyingRoutine || isRenewalActive) && !isCoachBlocked && (
+                                <div style={{ display: 'flex', gap: '10px', width: '100%', justifyContent: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => addGroup(day.name)}
+                                    disabled={isCoachBlocked}
+                                    style={{
+                                      background: '#a2d149',
+                                      color: '#fff',
+                                      border: 'none',
+                                      padding: '8px 16px',
+                                      borderRadius: '8px',
+                                      fontWeight: 800,
+                                      fontSize: '11px',
+                                      cursor: isCoachBlocked ? 'not-allowed' : 'pointer',
+                                      transition: 'all 0.2s',
+                                      boxShadow: '0 4px 10px rgba(162, 209, 73, 0.2)',
+                                      flex: '1',
+                                      minWidth: '120px',
+                                      maxWidth: '160px',
+                                      textAlign: 'center'
+                                    }}
+                                  >
+                                    + Agregar Bloque
+                                  </button>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => removeGroup(day.name, activeGroup.id)}
+                                    disabled={isCoachBlocked}
+                                    style={{
+                                      background: '#ef4444',
+                                      color: '#fff',
+                                      border: 'none',
+                                      padding: '8px 16px',
+                                      borderRadius: '8px',
+                                      fontWeight: 800,
+                                      fontSize: '11px',
+                                      cursor: isCoachBlocked ? 'not-allowed' : 'pointer',
+                                      transition: 'all 0.2s',
+                                      flex: '1',
+                                      minWidth: '120px',
+                                      maxWidth: '160px',
+                                      textAlign: 'center'
+                                    }}
+                                  >
+                                    🗑️ Eliminar Bloque
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Renderizar solo el grupo activo si existe */}
+                            {activeGroup && (
+                              <div className="day-groups" style={{ display: 'block' }}>
+                                <div className="exercise-group" style={{ margin: 0, padding: '16px', paddingTop: '8px' }}>
+                                  <div className="rows-holder">
+                                    {activeGroup.exercises.map((ex, idx) => (
+                                      <div
+                                        key={ex.id}
+                                        className="exercise-sub-row"
+                                        style={{ paddingTop: idx === 0 ? 0 : '15px' }}
+                                        onMouseEnter={() => { if (ex.img) preloadImage(ex.img); }}
+                                      >
+                                        <div className="field">
+                                          {activeGroup.exercises.length > 1 && (
+                                            <label style={{ fontWeight: 800, fontSize: '10px', display: 'block', marginBottom: '8px' }}>
+                                              {idx === 0 ? 'EJERCICIO A' : 'EJERCICIO B'}
+                                            </label>
+                                          )}
+                                          <input
+                                            type="text"
+                                            list="exercises-list"
+                                            className="sel-name"
+                                            placeholder="Buscar ejercicio..."
+                                            value={ex.name}
+                                            disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked}
+                                            style={{
+                                              width: '100%',
+                                              boxSizing: 'border-box',
+                                              ...(((isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked)
+                                                ? lockedStyle
+                                                : { border: '2px solid #e2e8f0', borderRadius: '8px', padding: '10px' })
+                                            }}
+                                            onChange={(e) => updateExercise(day.name, activeGroup.id, ex.id, 'name', e.target.value)}
+                                            onFocus={(e) => e.target.select()}
+                                          />
+                                        </div>
+
+                                        <div className="field">
+                                          <label style={{ fontWeight: 800, fontSize: '10px' }}>MÉTRICA</label>
+                                          <div className="metric-split">
+                                            {ex.isCardio ? (
+                                              <div className="metric-field">
+                                                <label>TIEMPO (MIN)</label>
+                                                <input
+                                                  type="text"
+                                                  placeholder="00"
+                                                  value={ex.series}
+                                                  disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked}
+                                                  style={{
+                                                    width: '100%',
+                                                    maxWidth: '80px',
+                                                    boxSizing: 'border-box',
+                                                    fontSize: '13px',
+                                                    ...(((isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked)
+                                                      ? { ...lockedStyle, padding: '6px 8px' }
+                                                      : { border: '1px solid #cbd5e1', borderRadius: '8px', padding: '6px 8px' })
+                                                  }}
+                                                  onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val.length <= 2) updateExercise(day.name, activeGroup.id, ex.id, 'series', val);
+                                                  }}
+                                                />
+                                              </div>
+                                            ) : (
+                                              <>
+                                                <div className="metric-field">
+                                                  <label>SERIES</label>
+                                                  <input
+                                                    type="text"
+                                                    placeholder="S"
+                                                    value={ex.series}
+                                                    disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked}
+                                                    style={{
+                                                      width: '100%',
+                                                      maxWidth: '70px',
+                                                      boxSizing: 'border-box',
+                                                      fontSize: '13px',
+                                                      ...(((isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked)
+                                                        ? { ...lockedStyle, padding: '6px 8px' }
+                                                        : { border: '1px solid #cbd5e1', borderRadius: '8px', padding: '6px 8px' })
+                                                    }}
+                                                    onChange={(e) => {
+                                                      const val = e.target.value;
+                                                      if (val.length <= 1) updateExercise(day.name, activeGroup.id, ex.id, 'series', val);
+                                                    }}
+                                                  />
+                                                </div>
+                                                <div className="metric-field">
+                                                  <label>REPS</label>
+                                                  <input
+                                                    type="text"
+                                                    placeholder="R"
+                                                    value={ex.reps}
+                                                    disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked}
+                                                    style={{
+                                                      width: '100%',
+                                                      maxWidth: '70px',
+                                                      boxSizing: 'border-box',
+                                                      fontSize: '13px',
+                                                      ...(((isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked)
+                                                        ? { ...lockedStyle, padding: '6px 8px' }
+                                                        : { border: '1px solid #cbd5e1', borderRadius: '8px', padding: '6px 8px' })
+                                                    }}
+                                                    onChange={(e) => {
+                                                      const val = e.target.value;
+                                                      if (val.length <= 3) updateExercise(day.name, activeGroup.id, ex.id, 'reps', val);
+                                                    }}
+                                                  />
+                                                </div>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="field field-notes">
+                                          <label style={{ fontWeight: 800, fontSize: '10px' }}>NOTAS DEL COACH</label>
+                                          <textarea
+                                            rows={3}
+                                            value={ex.note}
+                                            disabled={(isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked}
+                                            style={{
+                                              width: '100%',
+                                              boxSizing: 'border-box',
+                                              ...(((isReadOnly && !isModifyingRoutine && !isRenewalActive) || isCoachBlocked)
+                                                ? lockedStyle
+                                                : { border: '2px solid #e2e8f0', borderRadius: '8px', padding: '10px' })
+                                            }}
+                                            onChange={(e) => updateExercise(day.name, activeGroup.id, ex.id, 'note', e.target.value)}
+                                          />
+                                        </div>
+
+                                        <div className="img-preview-box">
+                                          {ex.img ? (
+                                            <ExerciseImage src={ex.img} alt={ex.name} />
+                                          ) : (
+                                            <span>+ FOTO (Auto)</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {(!isReadOnly || isModifyingRoutine || isRenewalActive) && !isCoachBlocked && activeGroup.exercises.length < 2 && (
+                                    <button className="btn btn-biserie" onClick={() => addBiserie(day.name, activeGroup.id)} disabled={isCoachBlocked} style={isCoachBlocked ? lockedStyle : {}}>
+                                      + AGREGAR BISERIE
+                                    </button>
+                                  )}
+                                  <div className="rest-time-label">
+                                    ⌛ 3 MINUTOS DE DESCANSO POST-BLOQUE
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {!isReadOnly && (
@@ -2124,6 +3367,55 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                 >
                   {isLoadingLocal ? 'PUBLICANDO...' : (isCoachBlocked ? 'ACCESO RESTRINGIDO' : (!athlete.is_active && !isRenewalActive ? 'USUARIO INACTIVO' : 'PUBLICAR RUTINA'))}
                 </button>
+              )}
+
+              {isReadOnly && isModifyingRoutine && (
+                <div style={{ display: 'flex', gap: '15px', marginTop: '25px', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={cancelModifyingRoutine}
+                    disabled={isLoadingLocal}
+                    style={{
+                      background: '#ef4444',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '14px 28px',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: isLoadingLocal ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={e => !isLoadingLocal && (e.currentTarget.style.background = '#dc2626')}
+                    onMouseOut={e => !isLoadingLocal && (e.currentTarget.style.background = '#ef4444')}
+                  >
+                    Cancelar Cambios
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={publishRoutine}
+                    disabled={isLoadingLocal || isCoachBlocked}
+                    style={{
+                      background: '#22c55e',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '14px 28px',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: (isLoadingLocal || isCoachBlocked) ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 12px rgba(34, 197, 94, 0.15)',
+                      transition: 'all 0.2s',
+                      opacity: (isLoadingLocal || isCoachBlocked) ? 0.7 : 1
+                    }}
+                    onMouseOver={e => !(isLoadingLocal || isCoachBlocked) && (e.currentTarget.style.background = '#16a34a')}
+                    onMouseOut={e => !(isLoadingLocal || isCoachBlocked) && (e.currentTarget.style.background = '#22c55e')}
+                  >
+                    {isLoadingLocal ? 'ACTUALIZANDO...' : 'Actualizar Rutina'}
+                  </button>
+                </div>
               )}
 
               {statusMsg.text && (
