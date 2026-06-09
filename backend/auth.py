@@ -28,13 +28,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 def verify_google_token(token: str):
     try:
-        # idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
-        # Bypassing strict verification for initial dev if client ID isn't set, 
-        # but normally we use the line above. For now, since we don't have the client ID,
-        # we will decode without verifying the audience.
-        # WARNING: In production, uncomment the line above and remove the one below.
-        idinfo = jwt.get_unverified_claims(token)
-        
+        idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
         return idinfo
     except Exception:
         raise HTTPException(
