@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logoBody2 from '../assets/logobody2.png';
@@ -18,9 +17,53 @@ const Login = () => {
       setErrorMsg(msg);
       localStorage.removeItem('plan_expired_msg');
     }
+
+    const initializeGoogleSignIn = () => {
+      const g = (window as any).google;
+      if (g && g.accounts && g.accounts.id) {
+        if (!(window as any).google_initialized) {
+          const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+          g.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleSuccess,
+          });
+          (window as any).google_initialized = true;
+        }
+
+        const buttonElem = document.getElementById('google-login-button');
+        if (buttonElem) {
+          g.accounts.id.renderButton(buttonElem, {
+            theme: 'outline',
+            shape: 'pill',
+            size: 'large',
+          });
+        }
+      }
+    };
+
+    // Load Google SDK script dynamically if not present
+    let script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement;
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = initializeGoogleSignIn;
+      document.body.appendChild(script);
+    } else {
+      if ((window as any).google) {
+        initializeGoogleSignIn();
+      } else {
+        const existingOnload = script.onload;
+        script.onload = (e) => {
+          if (existingOnload) (existingOnload as any)(e);
+          initializeGoogleSignIn();
+        };
+      }
+    }
   }, []);
 
-  const handleSuccess = async (credentialResponse: CredentialResponse) => {
+  const handleSuccess = async (credentialResponse: any) => {
     try {
       const token = credentialResponse.credential;
       if (!token) throw new Error("No token received");
@@ -163,15 +206,7 @@ const Login = () => {
         <h3 style={{ marginBottom: 15, color: '#2d4739', fontSize: '1rem' }}>Acceder a tu Plan</h3>
 
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <GoogleLogin
-            onSuccess={handleSuccess}
-            onError={() => {
-              setErrorMsg('El inicio de sesión falló. Por favor, intenta de nuevo.');
-            }}
-            ux_mode="popup"
-            theme="outline"
-            shape="pill"
-          />
+          <div id="google-login-button"></div>
         </div>
 
         {errorMsg && (

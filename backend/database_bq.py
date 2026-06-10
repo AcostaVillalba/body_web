@@ -1,6 +1,8 @@
 import os
 import uuid
 import time
+import random
+import threading
 from datetime import datetime, timezone, timedelta
 from google.cloud import bigquery
 from google.oauth2 import service_account
@@ -10,6 +12,23 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 
 def now_bogota():
     return datetime.now(tz=BOGOTA_TZ)
+
+EPOCH_2024_MS = 1704067200000
+_id_counter = random.randint(0, 4095)
+_id_lock = threading.Lock()
+
+def generate_safe_id() -> int:
+    """
+    Generates a 53-bit unique, chronological integer ID.
+    Fits within JS Number.MAX_SAFE_INTEGER (2^53 - 1) to prevent frontend precision issues.
+    Fits in BigQuery INT64 (INTEGER) without database migrations.
+    """
+    global _id_counter
+    t_ms = int(time.time() * 1000) - EPOCH_2024_MS
+    with _id_lock:
+        _id_counter = (_id_counter + 1) & 4095
+        seq = _id_counter
+    return (t_ms << 12) | seq
 
 class BigQueryDB:
     def __init__(self):
@@ -43,8 +62,8 @@ class BigQueryDB:
         return results[0] if results else None
 
     def create_user(self, email, name, role, google_id=None, coach_id=None):
-        # Generate a numeric ID based on timestamp to avoid collisions
-        new_id = int(time.time() * 1000) % 2147483647
+        # Generate a 53-bit safe integer ID
+        new_id = generate_safe_id()
         user_row = {
             "id": new_id,
             "email": email,
@@ -96,7 +115,7 @@ class BigQueryDB:
                   f"WHERE user_id=@user_id"
         else:
             # Insert
-            new_id = int(time.time() * 1000) % 2147483647
+            new_id = generate_safe_id()
             sql = f"INSERT INTO `{PROJECT_ID}.{DATASET_ID}.client_profiles` " \
                   f"(id, user_id, age, weight, goal, plan_type, start_date, end_date, control_date) " \
                   f"VALUES (@id, @user_id, @age, @weight, @goal, @plan_type, @start_date, @end_date, @control_date)"
@@ -138,7 +157,7 @@ class BigQueryDB:
         return results[0] if results else None
 
     def save_routine(self, user_id, routine_data):
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "user_id": user_id,
@@ -153,7 +172,7 @@ class BigQueryDB:
         return self.query(sql, params)
 
     def add_weight_record(self, user_id, weight, notes=None, routine_id=None):
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "user_id": user_id,
@@ -179,7 +198,7 @@ class BigQueryDB:
         return True
 
     def create_notification(self, user_id, message):
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "user_id": user_id,
@@ -283,7 +302,7 @@ class BigQueryDB:
             return True
 
         # 3. Si no existe, crear uno nuevo
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "coach_id": coach_id,
@@ -337,7 +356,7 @@ class BigQueryDB:
         return True
 
     def log_completed_workout(self, user_id, day_name, stars):
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "user_id": user_id,

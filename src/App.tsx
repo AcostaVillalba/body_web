@@ -1,6 +1,5 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -65,15 +64,11 @@ const AppContent = () => {
 
 function App() {
   console.log("App component rendered");
-  // Configuración segura usando el .env de Vite (variables prefijadas con VITE_)
-  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "FALTA_COLOCAR_ID_EN_EL_ARCHIVO_ENV";
 
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </GoogleOAuthProvider>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

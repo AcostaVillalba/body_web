@@ -5,7 +5,7 @@ load_dotenv()
 from google.cloud import bigquery
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Union, Any
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -34,7 +34,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
@@ -46,8 +46,8 @@ class TokenReq(BaseModel):
     token: str
 
 class ClientProfileBase(BaseModel):
-    age: Any
-    weight: Any
+    age: Optional[int] = None
+    weight: Optional[int] = None
     goal: str
     planType: str
     startDate: str
@@ -55,6 +55,13 @@ class ClientProfileBase(BaseModel):
     controlDate: str
     isRenewal: Optional[bool] = False
     coach_id: Optional[int] = None
+
+    @field_validator('age', 'weight', mode='before')
+    @classmethod
+    def empty_string_to_none(cls, v: Any) -> Any:
+        if v == '':
+            return None
+        return v
 
 class UserStatusReq(BaseModel):
     is_active: bool
