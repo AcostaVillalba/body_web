@@ -96,7 +96,8 @@ const Login = () => {
         email: data.email,
         role: data.role,
         isActive: data.is_active,
-        profile_picture_url: data.profile_picture_url
+        profile_picture_url: data.profile_picture_url,
+        terms_accepted: data.terms_accepted
       });
 
       // We stay in loading state while the next page fetches its data

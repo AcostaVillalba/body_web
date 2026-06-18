@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import Login from './pages/Login';
 import LoadingScreen from './components/LoadingScreen';
+import TermsModal from './components/TermsModal';
 
 // Lazy loading components for better performance
 const CoachDashboard = lazy(() => import('./pages/CoachDashboard'));
@@ -27,7 +28,19 @@ const RootRedirect = () => {
 };
 
 const AppContent = () => {
-  const { isLoading } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
+  
+  // Bloquear acceso si está autenticado pero no ha aceptado los términos vigentes
+  const showTermsModal = isAuthenticated && user && !user.terms_accepted;
+
+  if (showTermsModal) {
+    return (
+      <>
+        <LoadingScreen isLoading={isLoading} />
+        <TermsModal />
+      </>
+    );
+  }
   
   return (
     <>

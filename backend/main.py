@@ -20,6 +20,8 @@ from routes.wompi import router as wompi_router
 app = FastAPI(title="Body Logic BigQuery Server")
 app.include_router(wompi_router, prefix="/api/wompi", tags=["Wompi"])
 
+CURRENT_TERMS_VERSION = "v1.0"
+
 
 # Configuración de CORS
 origins = [
@@ -44,6 +46,9 @@ app.add_middleware(
 # Pydantic Schemas
 class TokenReq(BaseModel):
     token: str
+
+class AcceptTermsReq(BaseModel):
+    version: str
 
 class ClientProfileBase(BaseModel):
     age: Optional[int] = None
@@ -130,6 +135,8 @@ def google_auth(req: TokenReq):
         data={"sub": user['email'], "role": user['role']}, expires_delta=access_token_expires
     )
     
+    terms_accepted = bool(user.get("terms_accepted")) and user.get("terms_version") == CURRENT_TERMS_VERSION
+    
     return {
         "access_token": access_token, 
         "token_type": "bearer", 
@@ -137,8 +144,35 @@ def google_auth(req: TokenReq):
         "name": user['name'], 
         "email": user['email'], 
         "is_active": bool(user['is_active']),
-        "profile_picture_url": user.get('profile_picture_url')
+        "profile_picture_url": user.get('profile_picture_url'),
+        "terms_accepted": terms_accepted
     }
+
+@app.get("/api/auth/status")
+def get_auth_status(current_user=Depends(auth.get_current_user)):
+    db = get_bq_db()
+    # Fetch fresh user details from database to avoid cache issues
+    user = db.get_user_by_id(current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+    terms_accepted = bool(user.get("terms_accepted")) and user.get("terms_version") == CURRENT_TERMS_VERSION
+    
+    return {
+        "email": user["email"],
+        "is_active": bool(user["is_active"]),
+        "terms_accepted": terms_accepted,
+        "terms_version": user.get("terms_version")
+    }
+
+@app.post("/api/auth/accept-terms")
+def accept_terms(req: AcceptTermsReq, current_user=Depends(auth.get_current_user)):
+    if req.version != CURRENT_TERMS_VERSION:
+        raise HTTPException(status_code=400, detail=f"Versión de términos incorrecta. La versión vigente es {CURRENT_TERMS_VERSION}")
+        
+    db = get_bq_db()
+    db.accept_user_terms(current_user.id, req.version)
+    return {"status": "success", "message": "Términos y condiciones aceptados correctamente."}
 
 # ====================
 # Coach Endpoints

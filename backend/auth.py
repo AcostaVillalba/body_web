@@ -70,6 +70,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     from types import SimpleNamespace
     user = SimpleNamespace(**user_dict)
     
+    # Ensure terms properties exist on user
+    if not hasattr(user, "terms_accepted") or user.terms_accepted is None:
+        user.terms_accepted = False
+    if not hasattr(user, "terms_accepted_at"):
+        user.terms_accepted_at = None
+    if not hasattr(user, "terms_version"):
+        user.terms_version = None
+    
     # El bloqueo de "plan expirado" solo aplica a Clientes. 
     # Admins y Coaches siempre deben poder entrar.
     if user.role == "Client" and not user.is_active:

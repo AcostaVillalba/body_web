@@ -74,7 +74,10 @@ class BigQueryDB:
             "coach_id": coach_id,
             "phone": None,
             "instagram": None,
-            "profile_picture_url": None
+            "profile_picture_url": None,
+            "terms_accepted": False,
+            "terms_accepted_at": None,
+            "terms_version": None
         }
         if self.insert("users", user_row):
             return user_row
@@ -84,6 +87,17 @@ class BigQueryDB:
         sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.users` SET is_active = @is_active WHERE id = @id"
         params = [
             bigquery.ScalarQueryParameter("is_active", "BOOL", is_active),
+            bigquery.ScalarQueryParameter("id", "INTEGER", user_id)
+        ]
+        self.query(sql, params)
+        return True
+
+    def accept_user_terms(self, user_id, version):
+        sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.users` SET terms_accepted = @terms_accepted, terms_accepted_at = @terms_accepted_at, terms_version = @terms_version WHERE id = @id"
+        params = [
+            bigquery.ScalarQueryParameter("terms_accepted", "BOOL", True),
+            bigquery.ScalarQueryParameter("terms_accepted_at", "TIMESTAMP", now_bogota()),
+            bigquery.ScalarQueryParameter("terms_version", "STRING", version),
             bigquery.ScalarQueryParameter("id", "INTEGER", user_id)
         ]
         self.query(sql, params)
