@@ -42,7 +42,7 @@ def verify_google_token(token: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-from database_bq import get_bq_db
+from database_bq import get_bq_db, now_bogota
 
 # ... (código previo)
 
@@ -80,11 +80,21 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     
     # El bloqueo de "plan expirado" solo aplica a Clientes. 
     # Admins y Coaches siempre deben poder entrar.
-    if user.role == "Client" and not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso."
-        )
+    if user.role == "Client":
+        is_active = bool(getattr(user, "is_active", True))
+        end_date_str = getattr(user, "end_date", None)
+        if end_date_str:
+            if hasattr(end_date_str, 'strftime'):
+                end_date_str = end_date_str.strftime("%Y-%m-%d")
+            today = now_bogota().strftime("%Y-%m-%d")
+            if end_date_str < today:
+                is_active = False
+        
+        if not is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso."
+            )
         
     return user
 

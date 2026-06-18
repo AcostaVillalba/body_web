@@ -137,13 +137,23 @@ def google_auth(req: TokenReq):
     
     terms_accepted = bool(user.get("terms_accepted")) and user.get("terms_version") == CURRENT_TERMS_VERSION
     
+    is_active = bool(user.get('is_active'))
+    if user.get('role') == 'Client':
+        end_date_str = user.get('end_date')
+        if end_date_str:
+            if hasattr(end_date_str, 'strftime'):
+                end_date_str = end_date_str.strftime("%Y-%m-%d")
+            today = now_bogota().strftime("%Y-%m-%d")
+            if end_date_str < today:
+                is_active = False
+
     return {
         "access_token": access_token, 
         "token_type": "bearer", 
         "role": user['role'], 
         "name": user['name'], 
         "email": user['email'], 
-        "is_active": bool(user['is_active']),
+        "is_active": is_active,
         "profile_picture_url": user.get('profile_picture_url'),
         "terms_accepted": terms_accepted
     }
@@ -158,9 +168,19 @@ def get_auth_status(current_user=Depends(auth.get_current_user)):
         
     terms_accepted = bool(user.get("terms_accepted")) and user.get("terms_version") == CURRENT_TERMS_VERSION
     
+    is_active = bool(user.get('is_active'))
+    if user.get('role') == 'Client':
+        end_date_str = user.get('end_date')
+        if end_date_str:
+            if hasattr(end_date_str, 'strftime'):
+                end_date_str = end_date_str.strftime("%Y-%m-%d")
+            today = now_bogota().strftime("%Y-%m-%d")
+            if end_date_str < today:
+                is_active = False
+
     return {
         "email": user["email"],
-        "is_active": bool(user["is_active"]),
+        "is_active": is_active,
         "terms_accepted": terms_accepted,
         "terms_version": user.get("terms_version")
     }
@@ -463,6 +483,7 @@ def create_coach(req: CoachCreate, current_user=Depends(auth.get_current_active_
         bigquery.ScalarQueryParameter("id", "INTEGER", new_coach['id'])
     ]
     db.query(sql, bq_params)
+    db.invalidate_user_cache(user_id=new_coach['id'])
     return {"status": "success", "message": "Coach creado en BigQuery"}
 
 @app.delete("/api/admin/coaches/{coach_id}")
@@ -472,6 +493,7 @@ def delete_coach(coach_id: int, current_user=Depends(auth.get_current_active_adm
     sql = f"DELETE FROM `{PROJECT_ID}.{DATASET_ID}.users` WHERE id = @id AND role = 'Coach'"
     params = [bigquery.ScalarQueryParameter("id", "INTEGER", coach_id)]
     db.query(sql, params)
+    db.invalidate_user_cache(user_id=coach_id)
     return {"message": "Coach eliminado"}
 
 @app.get("/api/notifications")
@@ -560,6 +582,7 @@ def update_coach_profile(req: CoachProfileUpdate, current_user=Depends(auth.get_
     
     try:
         db.query(sql, bq_params)
+        db.invalidate_user_cache(user_id=current_user.id)
         return {"status": "success", "message": "Perfil actualizado correctamente"}
     except Exception as e:
         print(f"Error updating coach profile: {str(e)}")
