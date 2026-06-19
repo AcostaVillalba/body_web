@@ -21,6 +21,11 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(162, 209, 73, 0.4) transparent;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 :root {
@@ -125,11 +130,19 @@ body {
 .grid-inputs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+  gap: 12px;
   background: #fafafa;
   border: 1px solid var(--border-light);
-  padding: 30px;
+  padding: 20px;
   border-radius: 16px;
+}
+
+.grid-inputs input,
+.grid-inputs select,
+.grid-inputs textarea {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  border-radius: 8px !important;
 }
 
 .field {
@@ -141,7 +154,7 @@ body {
 
 .field-notes {
   flex: 2;
-  min-width: 250px;
+  min-width: 150px;
 }
 
 .field label {
@@ -198,22 +211,23 @@ optgroup {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 15px;
-  padding: 20px 30px;
+  gap: 8px;
+  padding: 12px 16px;
   background: #fafafa;
   border: 1px solid var(--border-light);
-  border-radius: 16px;
+  border-radius: 12px;
 }
 
 .days-selector label {
   font-weight: 700;
+  font-size: 11px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
+  gap: 6px;
+  padding: 6px 12px;
   background: #ffffff;
-  border-radius: 30px;
+  border-radius: 20px;
   border: 2px solid var(--border-light);
   transition: all 0.2s;
   color: var(--text-muted);
@@ -227,6 +241,12 @@ optgroup {
 
 .days-selector input {
   display: none;
+}
+
+.days-selector .main-add-btn {
+  padding: 8px 16px;
+  font-size: 10.5px;
+  border-radius: 8px;
 }
 
 /* Buttons */
@@ -357,15 +377,15 @@ optgroup {
 
 .metric-field input {
   text-align: center;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 800;
+  padding: 6px 8px;
 }
 
-/* Image Preview */
 .img-preview-box {
   width: 220px;
   flex-shrink: 0;
-  height: 150px;
+  height: 280px;
   border: 2px dashed #ccc;
   border-radius: 12px;
   display: flex;
@@ -469,7 +489,11 @@ optgroup {
   .img-preview-box {
     width: 100%;
     height: auto;
-    aspect-ratio: 16/9;
+    aspect-ratio: 1;
+  }
+
+  .field-notes {
+    min-width: 120px;
   }
 
   .day-header {

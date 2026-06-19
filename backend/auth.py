@@ -6,13 +6,18 @@ from fastapi.security import OAuth2PasswordBearer
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-# In a real app, you would load these from a .env file
-SECRET_KEY = os.getenv("SECRET_KEY", "SUPER_SECRET_BODYLOGIC_KEY_CHANGE_ME")
+# Load and strictly validate environment variables
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY or SECRET_KEY.strip() == "" or SECRET_KEY == "SUPER_SECRET_BODYLOGIC_KEY_CHANGE_ME":
+    raise RuntimeError("SECRET_KEY environment variable is missing, empty, or using the default insecure value.")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # Google OAuth Client ID
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "YOUR_GOOGLE_CLIENT_ID_HERE") 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+if not GOOGLE_CLIENT_ID or GOOGLE_CLIENT_ID.strip() == "" or GOOGLE_CLIENT_ID == "YOUR_GOOGLE_CLIENT_ID_HERE":
+    raise RuntimeError("GOOGLE_CLIENT_ID environment variable is missing, empty, or using the default value.")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -28,13 +33,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 def verify_google_token(token: str):
     try:
-        # idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
-        # Bypassing strict verification for initial dev if client ID isn't set, 
-        # but normally we use the line above. For now, since we don't have the client ID,
-        # we will decode without verifying the audience.
-        # WARNING: In production, uncomment the line above and remove the one below.
-        idinfo = jwt.get_unverified_claims(token)
-        
+        idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
         return idinfo
     except Exception:
         raise HTTPException(
@@ -43,7 +42,7 @@ def verify_google_token(token: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-from database_bq import get_bq_db
+from database_bq import get_bq_db, now_bogota
 
 # ... (código previo)
 
@@ -71,13 +70,31 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     from types import SimpleNamespace
     user = SimpleNamespace(**user_dict)
     
+    # Ensure terms properties exist on user
+    if not hasattr(user, "terms_accepted") or user.terms_accepted is None:
+        user.terms_accepted = False
+    if not hasattr(user, "terms_accepted_at"):
+        user.terms_accepted_at = None
+    if not hasattr(user, "terms_version"):
+        user.terms_version = None
+    
     # El bloqueo de "plan expirado" solo aplica a Clientes. 
     # Admins y Coaches siempre deben poder entrar.
-    if user.role == "Client" and not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso."
-        )
+    if user.role == "Client":
+        is_active = bool(getattr(user, "is_active", True))
+        end_date_str = getattr(user, "end_date", None)
+        if end_date_str:
+            if hasattr(end_date_str, 'strftime'):
+                end_date_str = end_date_str.strftime("%Y-%m-%d")
+            today = now_bogota().strftime("%Y-%m-%d")
+            if end_date_str < today:
+                is_active = False
+        
+        if not is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Su plan ha expirado. Por favor, comuníquese con su coach para renovar su acceso."
+            )
         
     return user
 

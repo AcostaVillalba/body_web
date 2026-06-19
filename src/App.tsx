@@ -1,11 +1,11 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import Login from './pages/Login';
 import LoadingScreen from './components/LoadingScreen';
+import TermsModal from './components/TermsModal';
 
 // Lazy loading components for better performance
 const CoachDashboard = lazy(() => import('./pages/CoachDashboard'));
@@ -28,7 +28,19 @@ const RootRedirect = () => {
 };
 
 const AppContent = () => {
-  const { isLoading } = useAuth();
+  const { isLoading, isAuthenticated, user } = useAuth();
+  
+  // Bloquear acceso si está autenticado pero no ha aceptado los términos vigentes
+  const showTermsModal = isAuthenticated && user && !user.terms_accepted;
+
+  if (showTermsModal) {
+    return (
+      <>
+        <LoadingScreen isLoading={isLoading} />
+        <TermsModal />
+      </>
+    );
+  }
   
   return (
     <>
@@ -65,15 +77,11 @@ const AppContent = () => {
 
 function App() {
   console.log("App component rendered");
-  // Configuración segura usando el .env de Vite (variables prefijadas con VITE_)
-  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "FALTA_COLOCAR_ID_EN_EL_ARCHIVO_ENV";
 
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </GoogleOAuthProvider>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

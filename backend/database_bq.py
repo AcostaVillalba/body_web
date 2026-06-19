@@ -1,6 +1,8 @@
 import os
 import uuid
 import time
+import random
+import threading
 from datetime import datetime, timezone, timedelta
 from google.cloud import bigquery
 from google.oauth2 import service_account
@@ -11,9 +13,71 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 def now_bogota():
     return datetime.now(tz=BOGOTA_TZ)
 
+EPOCH_2024_MS = 1704067200000
+_id_counter = random.randint(0, 4095)
+_id_lock = threading.Lock()
+
+def generate_safe_id() -> int:
+    """
+    Generates a 53-bit unique, chronological integer ID.
+    Fits within JS Number.MAX_SAFE_INTEGER (2^53 - 1) to prevent frontend precision issues.
+    Fits in BigQuery INT64 (INTEGER) without database migrations.
+    """
+    global _id_counter
+    t_ms = int(time.time() * 1000) - EPOCH_2024_MS
+    with _id_lock:
+        _id_counter = (_id_counter + 1) & 4095
+        seq = _id_counter
+    return (t_ms << 12) | seq
+
 class BigQueryDB:
     def __init__(self):
         self.client = client
+        self._cache = {}  # Formato: {(category, key): (value, timestamp)}
+        self._cache_lock = threading.Lock()
+        self._cache_ttl = 300  # 5 minutos en segundos
+
+    def _get_cache(self, category, key):
+        with self._cache_lock:
+            if (category, key) in self._cache:
+                val, ts = self._cache[(category, key)]
+                if time.time() - ts < self._cache_ttl:
+                    return True, val
+                else:
+                    del self._cache[(category, key)]
+            return False, None
+
+    def _set_cache(self, category, key, value):
+        with self._cache_lock:
+            self._cache[(category, key)] = (value, time.time())
+
+    def invalidate_user_cache(self, user_id=None, email=None):
+        with self._cache_lock:
+            resolved_email = email
+            resolved_id = user_id
+            
+            # Buscar en el caché existente para mapear el ID al correo o viceversa
+            for k, (val, _) in self._cache.items():
+                category, key_val = k
+                if val and isinstance(val, dict):
+                    if category == "user_by_id" and resolved_id is not None and key_val == resolved_id:
+                        resolved_email = val.get("email")
+                    elif category == "user_by_email" and resolved_email is not None and key_val == resolved_email:
+                        resolved_id = val.get("id")
+
+            keys_to_delete = []
+            for k in list(self._cache.keys()):
+                category, key_val = k
+                if category == "user_by_id" and (key_val == resolved_id or key_val == user_id):
+                    keys_to_delete.append(k)
+                elif category == "user_by_email" and (key_val == resolved_email or key_val == email):
+                    keys_to_delete.append(k)
+                elif category == "client_profile" and (key_val == resolved_id or key_val == user_id):
+                    keys_to_delete.append(k)
+
+            for k in keys_to_delete:
+                self._cache.pop(k, None)
+
 
 
     def query(self, sql, params=None):
@@ -31,20 +95,50 @@ class BigQueryDB:
         return True
 
     def get_user_by_email(self, email):
-        sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.users` WHERE email = @email LIMIT 1"
+        hit, cached = self._get_cache("user_by_email", email)
+        if hit:
+            return cached
+
+        sql = f"""
+            SELECT u.*, cp.end_date
+            FROM `{PROJECT_ID}.{DATASET_ID}.users` u
+            LEFT JOIN `{PROJECT_ID}.{DATASET_ID}.client_profiles` cp ON u.id = cp.user_id
+            WHERE u.email = @email
+            LIMIT 1
+        """
         params = [bigquery.ScalarQueryParameter("email", "STRING", email)]
         results = self.query(sql, params)
-        return results[0] if results else None
+        res = results[0] if results else None
+        
+        if res:
+            self._set_cache("user_by_email", email, res)
+            self._set_cache("user_by_id", res.get("id"), res)
+        return res
 
     def get_user_by_id(self, user_id):
-        sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.users` WHERE id = @id LIMIT 1"
+        hit, cached = self._get_cache("user_by_id", user_id)
+        if hit:
+            return cached
+
+        sql = f"""
+            SELECT u.*, cp.end_date
+            FROM `{PROJECT_ID}.{DATASET_ID}.users` u
+            LEFT JOIN `{PROJECT_ID}.{DATASET_ID}.client_profiles` cp ON u.id = cp.user_id
+            WHERE u.id = @id
+            LIMIT 1
+        """
         params = [bigquery.ScalarQueryParameter("id", "INTEGER", user_id)]
         results = self.query(sql, params)
-        return results[0] if results else None
+        res = results[0] if results else None
+        
+        if res:
+            self._set_cache("user_by_id", user_id, res)
+            self._set_cache("user_by_email", res.get("email"), res)
+        return res
 
     def create_user(self, email, name, role, google_id=None, coach_id=None):
-        # Generate a numeric ID based on timestamp to avoid collisions
-        new_id = int(time.time() * 1000) % 2147483647
+        # Generate a 53-bit safe integer ID
+        new_id = generate_safe_id()
         user_row = {
             "id": new_id,
             "email": email,
@@ -55,9 +149,13 @@ class BigQueryDB:
             "coach_id": coach_id,
             "phone": None,
             "instagram": None,
-            "profile_picture_url": None
+            "profile_picture_url": None,
+            "terms_accepted": False,
+            "terms_accepted_at": None,
+            "terms_version": None
         }
         if self.insert("users", user_row):
+            self.invalidate_user_cache(user_id=new_id, email=email)
             return user_row
         return None
 
@@ -68,6 +166,19 @@ class BigQueryDB:
             bigquery.ScalarQueryParameter("id", "INTEGER", user_id)
         ]
         self.query(sql, params)
+        self.invalidate_user_cache(user_id=user_id)
+        return True
+
+    def accept_user_terms(self, user_id, version):
+        sql = f"UPDATE `{PROJECT_ID}.{DATASET_ID}.users` SET terms_accepted = @terms_accepted, terms_accepted_at = @terms_accepted_at, terms_version = @terms_version WHERE id = @id"
+        params = [
+            bigquery.ScalarQueryParameter("terms_accepted", "BOOL", True),
+            bigquery.ScalarQueryParameter("terms_accepted_at", "TIMESTAMP", now_bogota()),
+            bigquery.ScalarQueryParameter("terms_version", "STRING", version),
+            bigquery.ScalarQueryParameter("id", "INTEGER", user_id)
+        ]
+        self.query(sql, params)
+        self.invalidate_user_cache(user_id=user_id)
         return True
 
     def get_clients(self, coach_id=None, is_admin=False):
@@ -96,7 +207,7 @@ class BigQueryDB:
                   f"WHERE user_id=@user_id"
         else:
             # Insert
-            new_id = int(time.time() * 1000) % 2147483647
+            new_id = generate_safe_id()
             sql = f"INSERT INTO `{PROJECT_ID}.{DATASET_ID}.client_profiles` " \
                   f"(id, user_id, age, weight, goal, plan_type, start_date, end_date, control_date) " \
                   f"VALUES (@id, @user_id, @age, @weight, @goal, @plan_type, @start_date, @end_date, @control_date)"
@@ -123,13 +234,21 @@ class BigQueryDB:
             bigquery.ScalarQueryParameter("control_date", "STRING", profile_data['controlDate']),
         ])
         self.query(sql, params)
+        self.invalidate_user_cache(user_id=user_id)
         return True
 
     def get_client_profile(self, user_id):
+        hit, cached = self._get_cache("client_profile", user_id)
+        if hit:
+            return cached
+
         sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.client_profiles` WHERE user_id = @user_id LIMIT 1"
         params = [bigquery.ScalarQueryParameter("user_id", "INTEGER", user_id)]
         results = self.query(sql, params)
-        return results[0] if results else None
+        res = results[0] if results else None
+        
+        self._set_cache("client_profile", user_id, res)
+        return res
 
     def get_latest_routine(self, user_id):
         sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.routines` WHERE user_id = @user_id ORDER BY created_at DESC LIMIT 1"
@@ -138,7 +257,7 @@ class BigQueryDB:
         return results[0] if results else None
 
     def save_routine(self, user_id, routine_data):
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "user_id": user_id,
@@ -153,7 +272,7 @@ class BigQueryDB:
         return self.query(sql, params)
 
     def add_weight_record(self, user_id, weight, notes=None, routine_id=None):
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "user_id": user_id,
@@ -179,7 +298,7 @@ class BigQueryDB:
         return True
 
     def create_notification(self, user_id, message):
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "user_id": user_id,
@@ -283,7 +402,7 @@ class BigQueryDB:
             return True
 
         # 3. Si no existe, crear uno nuevo
-        new_id = int(time.time() * 1000) % 2147483647
+        new_id = generate_safe_id()
         row = {
             "id": new_id,
             "coach_id": coach_id,
@@ -334,7 +453,24 @@ class BigQueryDB:
             bigquery.ScalarQueryParameter("id", "INTEGER", user_id)
         ]
         self.query(sql, params)
+        self.invalidate_user_cache(user_id=user_id)
         return True
+
+    def log_completed_workout(self, user_id, day_name, stars):
+        new_id = generate_safe_id()
+        row = {
+            "id": new_id,
+            "user_id": user_id,
+            "completed_at": now_bogota().isoformat(),
+            "day_name": day_name,
+            "stars": stars
+        }
+        return self.insert("workout_logs", row)
+
+    def get_completed_workouts(self, user_id):
+        sql = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.workout_logs` WHERE user_id = @user_id ORDER BY completed_at DESC"
+        params = [bigquery.ScalarQueryParameter("user_id", "INTEGER", user_id)]
+        return self.query(sql, params)
 
 # Inicialización diferida
 _bq_db = None
