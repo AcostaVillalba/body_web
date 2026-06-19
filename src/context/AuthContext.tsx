@@ -22,6 +22,7 @@ interface AuthContextType {
   updateProfilePicture: (url: string) => void;
   acceptTermsInContext: () => void;
   isAuthenticated: boolean;
+  refreshUserStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +37,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+  };
+
+  const refreshUserStatus = async () => {
+    const savedToken = token || localStorage.getItem('token');
+    const savedUser = user || JSON.parse(localStorage.getItem('user') || 'null');
+    if (savedToken && savedUser) {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/status`, {
+          headers: {
+            'Authorization': `Bearer ${savedToken}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const updatedUser = {
+            ...savedUser,
+            isActive: data.is_active,
+            terms_accepted: data.terms_accepted
+          };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+      } catch (e) {
+        console.error("Error refreshing session status:", e);
+      }
+    }
   };
 
   useEffect(() => {
@@ -107,7 +134,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout, 
     updateProfilePicture, 
     acceptTermsInContext,
-    isAuthenticated: !!token 
+    isAuthenticated: !!token,
+    refreshUserStatus
   }), [user, token, isLoading]);
 
   return (

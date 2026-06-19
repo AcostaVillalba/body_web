@@ -304,7 +304,7 @@ const TEMPLATES_DATA: Record<string, {
 };
 
 export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideHeader, onCancel, isReadOnly: propIsReadOnly }: CoachDashboardProps = {}) {
-  const { token, logout, user, setIsLoading } = useAuth();
+  const { token, logout, user, setIsLoading, refreshUserStatus } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const transactionId = searchParams.get('id');
 
@@ -421,8 +421,21 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
   useEffect(() => {
     if (!wompiParams) return;
 
+    console.log("[Wompi] Inicializando widget de checkout con parámetros:", {
+      reference: wompiParams.reference,
+      amount_in_cents: wompiParams.amount_in_cents,
+      currency: wompiParams.currency || 'COP',
+      email: wompiParams.email,
+      fullName: wompiParams.full_name,
+      publicKey: wompiParams.public_key,
+      signatureExists: !!wompiParams.signature
+    });
+
     const container = document.getElementById('wompi-widget-container');
-    if (!container) return;
+    if (!container) {
+      console.error("[Wompi] No se encontró el contenedor '#wompi-widget-container' en el DOM.");
+      return;
+    }
     container.innerHTML = '';
 
     const form = document.createElement('form');
@@ -438,20 +451,25 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     script.setAttribute('data-customer-data:email', wompiParams.email);
     script.setAttribute('data-customer-data:full-name', wompiParams.full_name);
     
-    // NOTA DE DESARROLLO/SEGURIDAD: 'data-redirect-url' se mantiene comentado en local
-    // porque el cortafuegos (WAF) de CloudFront de Wompi bloquea peticiones HTTP con "localhost"
-    // en los parámetros (error 403). Para redirección local, configúrala en el Dashboard de Wompi.
-    // En producción (usando HTTPS), puedes descomentar las siguientes dos líneas:
-    // const redirectUrl = `${window.location.origin}/coach`;
-    // script.setAttribute('data-redirect-url', redirectUrl);
+    // Configuración de redirección inteligente en producción para evitar bloqueos locales del WAF de Wompi
+    const isLocalhost = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
+    if (!isLocalhost) {
+      const redirectUrl = `${window.location.origin}/coach`;
+      console.log("[Wompi] Entorno de producción detectado. Inyectando URL de redirección:", redirectUrl);
+      script.setAttribute('data-redirect-url', redirectUrl);
+    } else {
+      console.log("[Wompi] Entorno local (localhost/127.0.0.1) detectado. Se omite data-redirect-url para evitar bloqueos WAF de Wompi.");
+    }
 
     form.appendChild(script);
     container.appendChild(form);
 
     // Auto click to trigger Wompi modal checkout instantly
+    console.log("[Wompi] Simulando click para abrir checkout de Wompi...");
     const interval = setInterval(() => {
       const btn = form.querySelector('button');
       if (btn) {
+        console.log("[Wompi] Widget de Wompi cargado y botón clickeado.");
         btn.click();
         clearInterval(interval);
       }
@@ -466,6 +484,7 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
     setWompiLoading(true);
     setWompiError(null);
     setWompiParams(null);
+    console.log("[Wompi] handlePayWithWompi ejecutado. Llamando a preparar-pago backend...");
     try {
       const res = await fetch(`${API_URL}/api/wompi/preparar-pago`, {
         method: 'POST',
@@ -473,12 +492,14 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
       });
       if (!res.ok) {
         const errData = await res.json();
+        console.error("[Wompi] Error devuelto por API preparar-pago:", res.status, errData);
         throw new Error(errData.detail || "Error al preparar el pago seguro.");
       }
       const data = await res.json();
+      console.log("[Wompi] preparar-pago exitoso:", data);
       setWompiParams(data);
     } catch (err: any) {
-      console.error(err);
+      console.error("[Wompi] Excepción capturada en handlePayWithWompi:", err);
       setWompiError(err.message || "Error al conectar con la pasarela de pagos.");
     } finally {
       setWompiLoading(false);
@@ -488,16 +509,27 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
   const checkTransactionStatus = async (txId: string) => {
     setCheckingTransaction(true);
     setTransactionResult(null);
+    console.log(`[Wompi] Consultando estado de transacción '${txId}' al backend...`);
     try {
       const res = await fetch(`${API_URL}/api/wompi/transaccion/${txId}`);
-      if (!res.ok) throw new Error("Error al consultar el estado del pago.");
+      if (!res.ok) {
+        console.error(`[Wompi] Error HTTP al consultar estado de transacción '${txId}':`, res.status);
+        throw new Error("Error al consultar el estado del pago.");
+      }
       const data = await res.json();
+      console.log(`[Wompi] Resultado de consulta de transacción '${txId}':`, data);
       setTransactionResult(data);
       if (data.status === 'APPROVED') {
+        console.log("[Wompi] Transacción APROBADA. Refrescando cobros y estado del coach...");
         fetchPayments();
+        if (refreshUserStatus) {
+          refreshUserStatus();
+        }
+      } else {
+        console.warn(`[Wompi] Transacción no aprobada. Estado actual: ${data.status}`);
       }
     } catch (err: any) {
-      console.error(err);
+      console.error(`[Wompi] Excepción capturada al verificar transacción '${txId}':`, err);
       setTransactionResult({ status: 'ERROR', message: err.message });
     } finally {
       setCheckingTransaction(false);
@@ -2160,6 +2192,8 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
                     background: '#fff',
                     padding: '12px 20px',
                     borderRadius: '12px',
@@ -2174,7 +2208,7 @@ export default function CoachDashboard({ preloadedEmail, preloadedRoutine, hideH
                     {showAthleteDetails ? <ChevronUp size={16} color="#64748b" /> : <ChevronDown size={16} color="#64748b" />}
                     <span style={{ fontWeight: 800 }}>Datos del Atleta</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       className="btn"
                       onClick={(e) => {
