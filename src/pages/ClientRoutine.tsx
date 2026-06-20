@@ -215,18 +215,6 @@ const ClientRoutine = () => {
         setActiveInfoExercise(null);
     }, [openDay, currentStep]);
 
-    // Bloquear scroll de fondo cuando el entrenamiento a pantalla completa está activo
-    useEffect(() => {
-        if (openDay) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [openDay]);
-
     // Cerrar notificaciones al hacer click fuera
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -269,6 +257,607 @@ const ClientRoutine = () => {
 
     if (loading) {
         return <div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f1f5f9', color: '#111' }}><h3>Cargando tu plan...</h3></div>;
+    }
+
+    if (openDay) {
+        const day = routineDays.find(d => d.name === openDay);
+        if (!day) return null;
+        const totalGroups = day.groups.length;
+        const currentGroup = day.groups[currentStep];
+
+        if (!currentGroup) {
+            return (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                    background: '#111a13', color: '#fff', zIndex: 1500,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <button
+                        onClick={() => setOpenDay(null)}
+                        style={{
+                            position: 'absolute', top: 20, left: 20,
+                            background: 'rgba(255,255,255,0.08)', border: 'none',
+                            borderRadius: '50%', width: 44, height: 44,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', cursor: 'pointer'
+                        }}
+                    >
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h3 style={{ color: '#a2d149' }}>No hay ejercicios registrados en este día.</h3>
+                </div>
+            );
+        }
+
+        const isBiserie = currentGroup.exercises.length > 1;
+
+        return (
+            <div style={{
+                background: 'linear-gradient(135deg, #111a13 0%, #0c100d 100%)',
+                color: '#fff',
+                minHeight: '100vh',
+                fontFamily: "'Montserrat', sans-serif",
+                position: 'relative'
+            }}>
+                {/* Header */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 16px',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(20, 30, 24, 0.95)',
+                    backdropFilter: 'blur(10px)',
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 10
+                }}>
+                    <button
+                        onClick={() => setOpenDay(null)}
+                        style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                    >
+                        <ArrowLeft size={16} />
+                    </button>
+                    <h2 style={{
+                        margin: 0,
+                        fontSize: '15px',
+                        fontWeight: 900,
+                        letterSpacing: '1px',
+                        color: '#a2d149',
+                        textAlign: 'center',
+                        textTransform: 'uppercase'
+                    }}>
+                        {openDay}
+                    </h2>
+                    <div style={{ width: 32 }} />
+                </div>
+
+                {/* Exercise Content Area */}
+                <div style={{
+                    padding: '80px 8px 140px 8px', // Clear fixed header and footer
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: 'calc(100vh - 220px)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                }}>
+                    <div style={{
+                        width: '100%',
+                        maxWidth: '680px',
+                        background: 'rgba(24, 38, 30, 0.75)',
+                        border: '1.5px solid rgba(162, 209, 73, 0.25)',
+                        borderRadius: '24px',
+                        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.4)',
+                        backdropFilter: 'blur(12px)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        {/* Card Sub-Header */}
+                        {isBiserie && (
+                            <div style={{ display: 'flex', height: '42px', alignItems: 'stretch' }}>
+                                <div style={{
+                                    background: '#a2d149',
+                                    color: '#000',
+                                    flex: 1,
+                                    padding: 8,
+                                    fontWeight: 900,
+                                    fontSize: '10px',
+                                    letterSpacing: '1.5px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    textTransform: 'uppercase'
+                                }}>
+                                    🔥 BISERIE / SUPER SERIE
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Exercises List */}
+                        <div style={{
+                            padding: '16px 12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '16px'
+                        }}>
+                            {currentGroup.exercises.map((ex: any, idx: number) => {
+                                const currentImgUrl = getImageUrl(ex.name) || '';
+                                return (
+                                    <div key={ex.id} style={{
+                                        animation: 'slideIn 0.4s ease-out',
+                                        borderBottom: (isBiserie && idx < currentGroup.exercises.length - 1) ? '2px dashed rgba(255,255,255,0.1)' : 'none',
+                                        paddingBottom: (isBiserie && idx < currentGroup.exercises.length - 1) ? '25px' : '0',
+                                        position: 'relative'
+                                    }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            <div>
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    marginBottom: 8,
+                                                    width: '100%'
+                                                }}>
+                                                    {getMuscleGroup(ex.name) ? (
+                                                        <span style={{
+                                                            fontSize: '9px',
+                                                            fontWeight: 900,
+                                                            letterSpacing: '1px',
+                                                            textTransform: 'uppercase',
+                                                            color: '#a2d149',
+                                                            background: 'rgba(162, 209, 73, 0.12)',
+                                                            padding: '3px 8px',
+                                                            borderRadius: 20,
+                                                            border: '1px solid rgba(162, 209, 73, 0.2)'
+                                                        }}>
+                                                            {getMuscleGroup(ex.name)}
+                                                        </span>
+                                                    ) : <div />}
+                                                    
+                                                    {/* Botón de información estilo Deep Tech */}
+                                                    <button
+                                                        onClick={() => setActiveInfoExercise(activeInfoExercise === ex.name ? null : ex.name)}
+                                                        style={{
+                                                            background: activeInfoExercise === ex.name ? '#a2d149' : 'rgba(162, 209, 73, 0.15)',
+                                                            border: '1px solid rgba(162, 209, 73, 0.4)',
+                                                            borderRadius: '50%',
+                                                            width: '26px',
+                                                            height: '26px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: activeInfoExercise === ex.name ? '#000' : '#a2d149',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s',
+                                                            boxShadow: activeInfoExercise === ex.name ? '0 0 10px rgba(162,209,73,0.5)' : 'none',
+                                                            padding: 0
+                                                        }}
+                                                        onMouseOver={e => {
+                                                            if (activeInfoExercise !== ex.name) {
+                                                                e.currentTarget.style.background = 'rgba(162, 209, 73, 0.3)';
+                                                                e.currentTarget.style.transform = 'scale(1.08)';
+                                                            }
+                                                        }}
+                                                        onMouseOut={e => {
+                                                            if (activeInfoExercise !== ex.name) {
+                                                                e.currentTarget.style.background = 'rgba(162, 209, 73, 0.15)';
+                                                                e.currentTarget.style.transform = 'scale(1)';
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Info size={13} />
+                                                    </button>
+                                                </div>
+                                                <div style={{
+                                                    fontWeight: 900,
+                                                    fontSize: '16px',
+                                                    color: '#fff',
+                                                    marginBottom: 8,
+                                                    textTransform: 'uppercase',
+                                                    lineHeight: 1.2,
+                                                    textAlign: 'center'
+                                                }}>
+                                                    {isBiserie ? (idx === 0 ? 'A. ' : 'B. ') : ''}{ex.name}
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+                                                    <div style={{
+                                                        background: 'rgba(162, 209, 73, 0.2)',
+                                                        border: '1.5px solid rgba(162, 209, 73, 0.45)',
+                                                        color: '#fff',
+                                                        padding: '6px 16px',
+                                                        borderRadius: 30,
+                                                        fontWeight: 800,
+                                                        fontSize: '13px'
+                                                    }}>
+                                                        {ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series} Series x ${ex.reps} Reps`}
+                                                    </div>
+                                                </div>
+                                                {ex.note && (
+                                                    <div style={{
+                                                        fontSize: '12px',
+                                                        color: '#cbd5e1',
+                                                        background: 'rgba(255,255,255,0.03)',
+                                                        padding: '8px 12px',
+                                                        borderRadius: 8,
+                                                        borderLeft: '4px solid #a2d149',
+                                                        fontWeight: 500,
+                                                        lineHeight: 1.4
+                                                    }}>
+                                                        {ex.note}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {currentImgUrl && (
+                                                <div style={{
+                                                    width: '100%',
+                                                    borderRadius: 16,
+                                                    overflow: 'hidden',
+                                                    background: '#000',
+                                                    boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+                                                    border: '1px solid rgba(255,255,255,0.08)'
+                                                }}>
+                                                    <ExerciseImage src={currentImgUrl} alt={ex.name} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Rest Message */}
+                        <div style={{
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            color: '#94a3b8',
+                            textAlign: 'center',
+                            padding: '8px 10px',
+                            fontWeight: 800,
+                            fontSize: '9px',
+                            letterSpacing: '1px',
+                            borderTop: '1px solid rgba(255,255,255,0.08)'
+                        }}>
+                            ⌛ 3 MINUTOS DE DESCANSO DESPUÉS DE ESTE BLOQUE
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom Actions Sticky Footer */}
+                <div style={{
+                    background: 'rgba(16, 24, 20, 0.97)',
+                    backdropFilter: 'blur(10px)',
+                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                    padding: '15px 20px',
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 10,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    alignItems: 'center',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                }}>
+                    {/* Controls buttons */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        width: '100%',
+                        maxWidth: '600px'
+                    }}>
+                        <button
+                            disabled={currentStep === 0}
+                            onClick={() => setCurrentStep(prev => prev - 1)}
+                            style={{
+                                flex: 1,
+                                padding: '12px 10px',
+                                background: currentStep === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.08)',
+                                color: currentStep === 0 ? '#64748b' : '#fff',
+                                border: '1.5px solid',
+                                borderColor: currentStep === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.2)',
+                                borderRadius: 12,
+                                fontWeight: 900,
+                                fontSize: '11px',
+                                cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s',
+                                textTransform: 'uppercase',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            Anterior
+                        </button>
+
+                        <span style={{
+                            fontWeight: 900,
+                            fontSize: '14px',
+                            color: '#fff',
+                            minWidth: '35px',
+                            textAlign: 'center',
+                            letterSpacing: '0.5px'
+                        }}>
+                            {currentStep + 1}/{totalGroups}
+                        </span>
+
+                        <button
+                            onClick={() => {
+                                if (currentStep === totalGroups - 1) {
+                                    setRatingDayName(day.name);
+                                    setSelectedStars(0);
+                                    setHoveredStars(0);
+                                    setShowRatingModal(true);
+                                } else {
+                                    setCurrentStep(prev => prev + 1);
+                                }
+                            }}
+                            style={{
+                                flex: 1,
+                                padding: '12px 10px',
+                                background: currentStep === totalGroups - 1 ? '#a2d149' : '#2d4739',
+                                color: currentStep === totalGroups - 1 ? '#000' : '#fff',
+                                border: 'none',
+                                borderRadius: 12,
+                                fontWeight: 900,
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: currentStep === totalGroups - 1 
+                                    ? '0 6px 20px rgba(162, 209, 73, 0.35)' 
+                                    : '0 6px 20px rgba(45, 71, 57, 0.35)',
+                                textTransform: 'uppercase',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            {currentStep === totalGroups - 1 ? 'Finalizar' : 'Siguiente'}
+                        </button>
+                    </div>
+
+                    {/* Progress Dots */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                        {day.groups.map((_: any, idx: number) => (
+                            <div key={idx} style={{
+                                width: idx === currentStep ? '24px' : '8px',
+                                height: '8px',
+                                borderRadius: '4px',
+                                background: idx === currentStep ? '#a2d149' : 'rgba(255,255,255,0.2)',
+                                transition: 'all 0.3s'
+                            }} />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Biomechanical Benefits Modal */}
+                {activeInfoExercise && (() => {
+                    const activeEx = currentGroup.exercises.find((ex: any) => ex.name === activeInfoExercise);
+                    if (!activeEx) return null;
+                    const benefits = getExerciseBenefits(activeEx.name, getMuscleGroup(activeEx.name));
+                    return (
+                        <div 
+                            onClick={() => setActiveInfoExercise(null)}
+                            style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: 'rgba(0, 0, 0, 0.65)',
+                                backdropFilter: 'blur(4px)',
+                                WebkitBackdropFilter: 'blur(4px)',
+                                zIndex: 2000,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '20px',
+                                animation: 'fadeIn 0.2s ease-out'
+                            }}
+                        >
+                            <div 
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                    width: '90%',
+                                    maxWidth: '340px',
+                                    background: 'rgba(248, 250, 249, 0.85)',
+                                    backdropFilter: 'blur(20px)',
+                                    WebkitBackdropFilter: 'blur(20px)',
+                                    borderRadius: '20px',
+                                    border: '1.5px solid rgba(162, 209, 73, 0.4)',
+                                    padding: '16px 20px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+                                    animation: 'scaleIn 0.2s ease-out'
+                                }}
+                            >
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    borderBottom: '1px solid rgba(45, 71, 57, 0.15)',
+                                    paddingBottom: '8px',
+                                    marginBottom: '12px'
+                                }}>
+                                    <span style={{
+                                        fontSize: '11px',
+                                        fontWeight: 900,
+                                        color: '#1a3325',
+                                        letterSpacing: '1.5px',
+                                        textTransform: 'uppercase'
+                                    }}>
+                                        Beneficios Clave
+                                    </span>
+                                    <button
+                                        onClick={() => setActiveInfoExercise(null)}
+                                        style={{
+                                            background: 'rgba(0,0,0,0.08)',
+                                            border: 'none',
+                                            borderRadius: '50%',
+                                            width: '24px',
+                                            height: '24px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#000',
+                                            cursor: 'pointer',
+                                            padding: 0
+                                        }}
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px'
+                                }}>
+                                    {benefits.map((benefit, bIdx) => (
+                                        <div key={bIdx} style={{
+                                            display: 'flex',
+                                            gap: '8px',
+                                            alignItems: 'flex-start'
+                                        }}>
+                                            <span style={{
+                                                color: '#1a3325',
+                                                fontWeight: 900,
+                                                fontSize: '12px',
+                                                marginTop: '2px'
+                                            }}>
+                                                ●
+                                            </span>
+                                            <p style={{
+                                                margin: 0,
+                                                fontSize: '11px',
+                                                color: '#112217',
+                                                lineHeight: '1.4',
+                                                fontWeight: 700,
+                                                textAlign: 'left'
+                                            }}>
+                                                {benefit}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* Rating Modal */}
+                {showRatingModal && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 2000, animation: 'fadeIn 0.2s ease-out'
+                    }}>
+                        <div style={{
+                            background: '#fff', width: '90%', maxWidth: '400px',
+                            borderRadius: '24px', padding: '30px 20px', textAlign: 'center',
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative'
+                        }}>
+                            {!ratingSuccess ? (
+                                <>
+                                    <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#2d4739', margin: '0 0 10px 0' }}>
+                                        ¡ENTRENAMIENTO COMPLETADO! 🎉
+                                    </h3>
+                                    <p style={{ fontSize: '13px', color: '#64748b', fontWeight: 500, margin: '0 0 25px 0' }}>
+                                        Puntúa la rutina de hoy para activar tu racha y guardar tu progreso.
+                                    </p>
+                                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#334155', margin: '0 0 15px 0' }}>
+                                        ¿Cuántas estrellas le das a la rutina?
+                                    </p>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '30px' }}>
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <button
+                                                key={star}
+                                                type="button"
+                                                onClick={() => setSelectedStars(star)}
+                                                onMouseEnter={() => setHoveredStars(star)}
+                                                onMouseLeave={() => setHoveredStars(0)}
+                                                style={{
+                                                    background: 'transparent', border: 'none', cursor: 'pointer',
+                                                    fontSize: '36px', color: (hoveredStars || selectedStars) >= star ? '#facc15' : '#e2e8f0',
+                                                    transition: 'transform 0.1s, color 0.1s',
+                                                    transform: (hoveredStars || selectedStars) >= star ? 'scale(1.15)' : 'scale(1)'
+                                                }}
+                                            >
+                                                ★
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <button
+                                            type="button"
+                                            disabled={submittingRating}
+                                            onClick={() => setShowRatingModal(false)}
+                                            style={{
+                                                flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569',
+                                                border: 'none', borderRadius: '12px', fontWeight: 700, fontSize: '13px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={selectedStars === 0 || submittingRating}
+                                            onClick={handleCompleteWorkout}
+                                            style={{
+                                                flex: 2, padding: '12px',
+                                                background: selectedStars === 0 ? '#cbd5e1' : '#a2d149',
+                                                color: '#fff', border: 'none', borderRadius: '12px',
+                                                fontWeight: 800, fontSize: '13px',
+                                                cursor: selectedStars === 0 ? 'not-allowed' : 'pointer',
+                                                boxShadow: selectedStars === 0 ? 'none' : '0 8px 16px rgba(162, 209, 73, 0.25)',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {submittingRating ? 'Guardando...' : 'Enviar Calificación'}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ padding: '20px 0' }}>
+                                    <div style={{
+                                        fontSize: '60px', color: '#10b981', marginBottom: '20px',
+                                        animation: 'scaleIn 0.3s ease-out'
+                                    }}>
+                                        ✓
+                                    </div>
+                                    <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#10b981', margin: '0 0 10px 0' }}>
+                                        ¡Excelente Trabajo!
+                                    </h3>
+                                    <p style={{ fontSize: '14px', color: '#64748b', fontWeight: 600, margin: 0 }}>
+                                        Tu racha ha sido actualizada. ¡A seguir con toda! 🔥
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
     }
 
     return (
@@ -1316,518 +1905,7 @@ const ClientRoutine = () => {
                 }
             `}</style>
 
-            {openDay && (() => {
-                const day = routineDays.find(d => d.name === openDay);
-                if (!day) return null;
-                const totalGroups = day.groups.length;
-                const currentGroup = day.groups[currentStep];
 
-                if (!currentGroup) {
-                    return (
-                        <div style={{
-                            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-                            background: '#111a13', color: '#fff', zIndex: 1500,
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
-                        }}>
-                            <button
-                                onClick={() => setOpenDay(null)}
-                                style={{
-                                    position: 'absolute', top: 20, left: 20,
-                                    background: 'rgba(255,255,255,0.08)', border: 'none',
-                                    borderRadius: '50%', width: 44, height: 44,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: '#fff', cursor: 'pointer'
-                                }}
-                            >
-                                <ArrowLeft size={24} />
-                            </button>
-                            <h3 style={{ color: '#a2d149' }}>No hay ejercicios registrados en este día.</h3>
-                        </div>
-                    );
-                }
-
-                const isBiserie = currentGroup.exercises.length > 1;
-
-                return (
-                    <div style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100vw',
-                        height: '100vh',
-                        background: 'linear-gradient(135deg, #111a13 0%, #0c100d 100%)',
-                        color: '#fff',
-                        zIndex: 1500,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflowY: activeInfoExercise ? 'hidden' : 'auto',
-                        fontFamily: "'Montserrat', sans-serif"
-                    }}>
-                        {/* Header */}
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '8px 16px',
-                            borderBottom: '1px solid rgba(255,255,255,0.08)',
-                            background: 'rgba(20, 30, 24, 0.85)',
-                            backdropFilter: 'blur(10px)',
-                            position: 'sticky',
-                            top: 0,
-                            zIndex: 10
-                        }}>
-                            <button
-                                onClick={() => setOpenDay(null)}
-                                style={{
-                                    background: 'rgba(255,255,255,0.08)',
-                                    border: 'none',
-                                    borderRadius: '50%',
-                                    width: '32px',
-                                    height: '32px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                                onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                            >
-                                <ArrowLeft size={16} />
-                            </button>
-                            <h2 style={{
-                                margin: 0,
-                                fontSize: '15px',
-                                fontWeight: 900,
-                                letterSpacing: '1px',
-                                color: '#a2d149',
-                                textAlign: 'center',
-                                textTransform: 'uppercase'
-                            }}>
-                                {openDay}
-                            </h2>
-                            <div style={{ width: 32 }} />
-                        </div>
-
-                        {/* Exercise Content Area */}
-                        <div style={{
-                            flex: 1,
-                            padding: '12px 8px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '100%',
-                            boxSizing: 'border-box'
-                        }}>
-                            <div style={{
-                                width: '100%',
-                                maxWidth: '680px',
-                                background: 'rgba(24, 38, 30, 0.75)',
-                                border: '1.5px solid rgba(162, 209, 73, 0.25)',
-                                borderRadius: '24px',
-                                boxShadow: '0 20px 45px rgba(0, 0, 0, 0.4)',
-                                backdropFilter: 'blur(12px)',
-                                overflow: 'hidden',
-                                display: 'flex',
-                                flexDirection: 'column'
-                            }}>
-                                {/* Card Sub-Header */}
-                                {isBiserie && (
-                                    <div style={{ display: 'flex', height: '42px', alignItems: 'stretch' }}>
-                                        <div style={{
-                                            background: '#a2d149',
-                                            color: '#000',
-                                            flex: 1,
-                                            padding: 8,
-                                            fontWeight: 900,
-                                            fontSize: '10px',
-                                            letterSpacing: '1.5px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            textTransform: 'uppercase'
-                                        }}>
-                                            🔥 BISERIE / SUPER SERIE
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Exercises List */}
-                                <div style={{
-                                    padding: '16px 12px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '16px'
-                                }}>
-                                    {currentGroup.exercises.map((ex: any, idx: number) => {
-                                        const currentImgUrl = getImageUrl(ex.name) || '';
-                                        return (
-                                            <div key={ex.id} style={{
-                                                animation: 'slideIn 0.4s ease-out',
-                                                borderBottom: (isBiserie && idx < currentGroup.exercises.length - 1) ? '2px dashed rgba(255,255,255,0.1)' : 'none',
-                                                paddingBottom: (isBiserie && idx < currentGroup.exercises.length - 1) ? '25px' : '0',
-                                                position: 'relative'
-                                            }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                    <div>
-                                                        <div style={{
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            marginBottom: 8,
-                                                            width: '100%'
-                                                        }}>
-                                                            {getMuscleGroup(ex.name) ? (
-                                                                <span style={{
-                                                                    fontSize: '9px',
-                                                                    fontWeight: 900,
-                                                                    letterSpacing: '1px',
-                                                                    textTransform: 'uppercase',
-                                                                    color: '#a2d149',
-                                                                    background: 'rgba(162, 209, 73, 0.12)',
-                                                                    padding: '3px 8px',
-                                                                    borderRadius: 20,
-                                                                    border: '1px solid rgba(162, 209, 73, 0.2)'
-                                                                }}>
-                                                                    {getMuscleGroup(ex.name)}
-                                                                </span>
-                                                            ) : <div />}
-                                                            
-                                                            {/* Botón de información estilo Deep Tech */}
-                                                            <button
-                                                                onClick={() => setActiveInfoExercise(activeInfoExercise === ex.name ? null : ex.name)}
-                                                                style={{
-                                                                    background: activeInfoExercise === ex.name ? '#a2d149' : 'rgba(162, 209, 73, 0.15)',
-                                                                    border: '1px solid rgba(162, 209, 73, 0.4)',
-                                                                    borderRadius: '50%',
-                                                                    width: '26px',
-                                                                    height: '26px',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    color: activeInfoExercise === ex.name ? '#000' : '#a2d149',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s',
-                                                                    boxShadow: activeInfoExercise === ex.name ? '0 0 10px rgba(162,209,73,0.5)' : 'none',
-                                                                    padding: 0
-                                                                }}
-                                                                onMouseOver={e => {
-                                                                    if (activeInfoExercise !== ex.name) {
-                                                                        e.currentTarget.style.background = 'rgba(162, 209, 73, 0.3)';
-                                                                        e.currentTarget.style.transform = 'scale(1.08)';
-                                                                    }
-                                                                }}
-                                                                onMouseOut={e => {
-                                                                    if (activeInfoExercise !== ex.name) {
-                                                                        e.currentTarget.style.background = 'rgba(162, 209, 73, 0.15)';
-                                                                        e.currentTarget.style.transform = 'scale(1)';
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Info size={13} />
-                                                            </button>
-                                                        </div>
-                                                        <div style={{
-                                                            fontWeight: 900,
-                                                            fontSize: '16px',
-                                                            color: '#fff',
-                                                            marginBottom: 8,
-                                                            textTransform: 'uppercase',
-                                                            lineHeight: 1.2,
-                                                            textAlign: 'center'
-                                                        }}>
-                                                            {isBiserie ? (idx === 0 ? 'A. ' : 'B. ') : ''}{ex.name}
-                                                        </div>
-                                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
-                                                            <div style={{
-                                                                background: 'rgba(162, 209, 73, 0.2)',
-                                                                border: '1.5px solid rgba(162, 209, 73, 0.45)',
-                                                                color: '#fff',
-                                                                padding: '6px 16px',
-                                                                borderRadius: 30,
-                                                                fontWeight: 800,
-                                                                fontSize: '13px'
-                                                            }}>
-                                                                {ex.reps === "MIN" ? `${ex.series} Minutos` : `${ex.series} Series x ${ex.reps} Reps`}
-                                                            </div>
-                                                        </div>
-                                                        {ex.note && (
-                                                            <div style={{
-                                                                fontSize: '12px',
-                                                                color: '#cbd5e1',
-                                                                background: 'rgba(255,255,255,0.03)',
-                                                                padding: '8px 12px',
-                                                                borderRadius: 8,
-                                                                borderLeft: '4px solid #a2d149',
-                                                                fontWeight: 500,
-                                                                lineHeight: 1.4
-                                                            }}>
-                                                                {ex.note}
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {currentImgUrl && (
-                                                        <div style={{
-                                                            width: '100%',
-                                                            borderRadius: 16,
-                                                            overflow: 'hidden',
-                                                            background: '#000',
-                                                            boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
-                                                            border: '1px solid rgba(255,255,255,0.08)'
-                                                        }}>
-                                                            <ExerciseImage src={currentImgUrl} alt={ex.name} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Rest Message */}
-                                <div style={{
-                                    background: 'rgba(0, 0, 0, 0.2)',
-                                    color: '#94a3b8',
-                                    textAlign: 'center',
-                                    padding: '8px 10px',
-                                    fontWeight: 800,
-                                    fontSize: '9px',
-                                    letterSpacing: '1px',
-                                    borderTop: '1px solid rgba(255,255,255,0.08)'
-                                }}>
-                                    ⌛ 3 MINUTOS DE DESCANSO DESPUÉS DE ESTE BLOQUE
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Bottom Actions Sticky Footer */}
-                        <div style={{
-                            background: 'rgba(16, 24, 20, 0.95)',
-                            backdropFilter: 'blur(10px)',
-                            borderTop: '1px solid rgba(255,255,255,0.08)',
-                            padding: '15px 20px',
-                            position: 'sticky',
-                            bottom: 0,
-                            zIndex: 10,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px',
-                            alignItems: 'center',
-                            width: '100%',
-                            boxSizing: 'border-box'
-                        }}>
-                            {/* Controls buttons */}
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '12px',
-                                width: '100%',
-                                maxWidth: '600px'
-                            }}>
-                                <button
-                                    disabled={currentStep === 0}
-                                    onClick={() => setCurrentStep(prev => prev - 1)}
-                                    style={{
-                                        flex: 1,
-                                        padding: '12px 10px',
-                                        background: currentStep === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.08)',
-                                        color: currentStep === 0 ? '#64748b' : '#fff',
-                                        border: '1.5px solid',
-                                        borderColor: currentStep === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.2)',
-                                        borderRadius: 12,
-                                        fontWeight: 900,
-                                        fontSize: '11px',
-                                        cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
-                                        transition: 'all 0.2s',
-                                        textTransform: 'uppercase',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    Anterior
-                                </button>
-
-                                <span style={{
-                                    fontWeight: 900,
-                                    fontSize: '14px',
-                                    color: '#fff',
-                                    minWidth: '35px',
-                                    textAlign: 'center',
-                                    letterSpacing: '0.5px'
-                                }}>
-                                    {currentStep + 1}/{totalGroups}
-                                </span>
-
-                                <button
-                                    onClick={() => {
-                                        if (currentStep === totalGroups - 1) {
-                                            setRatingDayName(day.name);
-                                            setSelectedStars(0);
-                                            setHoveredStars(0);
-                                            setShowRatingModal(true);
-                                        } else {
-                                            setCurrentStep(prev => prev + 1);
-                                        }
-                                    }}
-                                    style={{
-                                        flex: 1,
-                                        padding: '12px 10px',
-                                        background: currentStep === totalGroups - 1 ? '#a2d149' : '#2d4739',
-                                        color: currentStep === totalGroups - 1 ? '#000' : '#fff',
-                                        border: 'none',
-                                        borderRadius: 12,
-                                        fontWeight: 900,
-                                        fontSize: '11px',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                        boxShadow: currentStep === totalGroups - 1 
-                                            ? '0 6px 20px rgba(162, 209, 73, 0.35)' 
-                                            : '0 6px 20px rgba(45, 71, 57, 0.35)',
-                                        textTransform: 'uppercase',
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    {currentStep === totalGroups - 1 ? 'Finalizar' : 'Siguiente'}
-                                </button>
-                            </div>
-
-                            {/* Progress Dots */}
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                {day.groups.map((_: any, idx: number) => (
-                                    <div key={idx} style={{
-                                        width: idx === currentStep ? '24px' : '8px',
-                                        height: '8px',
-                                        borderRadius: '4px',
-                                        background: idx === currentStep ? '#a2d149' : 'rgba(255,255,255,0.2)',
-                                        transition: 'all 0.3s'
-                                    }} />
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Biomechanical Benefits Modal (Compact & transparent glass overlay) */}
-                        {activeInfoExercise && (() => {
-                            const activeEx = currentGroup.exercises.find((ex: any) => ex.name === activeInfoExercise);
-                            if (!activeEx) return null;
-                            const benefits = getExerciseBenefits(activeEx.name, getMuscleGroup(activeEx.name));
-                            return (
-                                <div 
-                                    onClick={() => setActiveInfoExercise(null)}
-                                    style={{
-                                        position: 'fixed',
-                                        top: 0,
-                                        left: 0,
-                                        right: 0,
-                                        bottom: 0,
-                                        background: 'rgba(0, 0, 0, 0.65)',
-                                        backdropFilter: 'blur(4px)',
-                                        WebkitBackdropFilter: 'blur(4px)',
-                                        zIndex: 2000,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        padding: '20px',
-                                        animation: 'fadeIn 0.2s ease-out'
-                                    }}
-                                >
-                                    <div 
-                                        onClick={(e) => e.stopPropagation()}
-                                        style={{
-                                            width: '90%',
-                                            maxWidth: '340px',
-                                            background: 'rgba(248, 250, 249, 0.85)',
-                                            backdropFilter: 'blur(20px)',
-                                            WebkitBackdropFilter: 'blur(20px)',
-                                            borderRadius: '20px',
-                                            border: '1.5px solid rgba(162, 209, 73, 0.4)',
-                                            padding: '16px 20px',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
-                                            animation: 'scaleIn 0.2s ease-out'
-                                        }}
-                                    >
-                                        {/* Popup Header */}
-                                        <div style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            borderBottom: '1px solid rgba(45, 71, 57, 0.15)',
-                                            paddingBottom: '8px',
-                                            marginBottom: '12px'
-                                        }}>
-                                            <span style={{
-                                                fontSize: '11px',
-                                                fontWeight: 900,
-                                                color: '#1a3325',
-                                                letterSpacing: '1.5px',
-                                                textTransform: 'uppercase'
-                                            }}>
-                                                Beneficios Clave
-                                            </span>
-                                            <button
-                                                onClick={() => setActiveInfoExercise(null)}
-                                                style={{
-                                                    background: 'rgba(0,0,0,0.08)',
-                                                    border: 'none',
-                                                    borderRadius: '50%',
-                                                    width: '24px',
-                                                    height: '24px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: '#000',
-                                                    cursor: 'pointer',
-                                                    padding: 0
-                                                }}
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-
-                                        {/* Benefits List */}
-                                        <div style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '12px'
-                                        }}>
-                                            {benefits.map((benefit, bIdx) => (
-                                                <div key={bIdx} style={{
-                                                    display: 'flex',
-                                                    gap: '8px',
-                                                    alignItems: 'flex-start'
-                                                }}>
-                                                    <span style={{
-                                                        color: '#1a3325',
-                                                        fontWeight: 900,
-                                                        fontSize: '12px',
-                                                        marginTop: '2px'
-                                                    }}>
-                                                        ●
-                                                    </span>
-                                                    <p style={{
-                                                        margin: 0,
-                                                        fontSize: '11px',
-                                                        color: '#112217',
-                                                        lineHeight: '1.4',
-                                                        fontWeight: 700,
-                                                        textAlign: 'left'
-                                                    }}>
-                                                        {benefit}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-                    </div>
-                );
-            })()}
 
             {showRatingModal && (
                 <div style={{
