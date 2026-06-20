@@ -87,12 +87,30 @@ class BigQueryDB:
 
     def insert(self, table_name, row_dict):
         table_id = f"{PROJECT_ID}.{DATASET_ID}.{table_name}"
-        # BigQuery streaming inserts can take a few seconds to be available for query
-        errors = self.client.insert_rows_json(table_id, [row_dict])
-        if errors:
-            print(f"Error inserting into {table_name}: {errors}")
-            return False
-        return True
+        # Para las tablas 'payments' y 'users' que se actualizan inmediatamente vía DML UPDATE,
+        # usamos un Load Job sincrónico para evitar colocarlos en el 'streaming buffer' de BigQuery.
+        if table_name in ("payments", "users"):
+            try:
+                job_config = bigquery.LoadJobConfig(
+                    write_disposition="WRITE_APPEND"
+                )
+                load_job = self.client.load_table_from_json(
+                    [row_dict],
+                    table_id,
+                    job_config=job_config
+                )
+                load_job.result()  # Esperamos a que finalice el job de carga
+                return True
+            except Exception as e:
+                print(f"Error loading data into {table_name} via load job: {str(e)}")
+                return False
+        else:
+            # Para el resto de tablas, usamos la inserción en streaming convencional
+            errors = self.client.insert_rows_json(table_id, [row_dict])
+            if errors:
+                print(f"Error inserting into {table_name}: {errors}")
+                return False
+            return True
 
     def get_user_by_email(self, email):
         hit, cached = self._get_cache("user_by_email", email)

@@ -37,15 +37,17 @@ The backend is containerized using Docker and deployed to **Google Cloud Run**. 
    ```bash
    cd backend
 
-   gcloud run deploy body-web-backend `
-     --source . `
-     --region us-central1 `
-     --allow-unauthenticated `
-     --min-instances 0 `
-     --max-instances 1 `
-     --memory 256Mi `
-     --cpu 1 `
-     --concurrency 50
+    gcloud run deploy body-web-backend `
+      --source . `
+      --region us-central1 `
+      --allow-unauthenticated `
+      --min-instances 0 `
+      --max-instances 1 `
+      --memory 256Mi `
+      --cpu 1 `
+      --concurrency 50 `
+      --update-secrets="WOMPI_PRIVATE_KEY=WOMPI_PRIVATE_KEY:latest,WOMPI_INTEGRITY_KEY=WOMPI_INTEGRITY_KEY:latest,WOMPI_WEBHOOK_SECRET=WOMPI_WEBHOOK_SECRET:latest" `
+      --set-env-vars="SECRET_KEY=' nbcdhsaiñb236470347gbvcdudjcb 2536878946tgbgdcujd56789ijhgbdnjgbd678',GOOGLE_CLIENT_ID=949235205869-b9e9dv6keotduoe0v6fu6hgeh87kmnae.apps.googleusercontent.com,WOMPI_PUBLIC_KEY=pub_prod_tL5O8rRWdhCLu6jbSFUJdpuBZaKcAEL5"
    ```
 
 > [!CAUTION]

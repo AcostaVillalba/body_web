@@ -11,3 +11,4 @@ python-multipart
 Pillow
 google-cloud-storage
 requests
+python-dotenv
